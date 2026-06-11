@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Job Tracker — Prototype</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<style>
+:root {
+  --color-background-primary: #ffffff;
+  --color-background-secondary: #f5f5f4;
+  --color-background-tertiary: #eeece7;
+  --color-text-primary: #1a1a18;
+  --color-text-secondary: #5c5c58;
+  --color-text-tertiary: #8a8a85;
+  --color-text-info: #185FA5;
+  --color-text-warning: #854F0B;
+  --color-text-danger: #A32D2D;
+  --color-border-tertiary: rgba(0,0,0,0.1);
+  --color-border-secondary: rgba(0,0,0,0.2);
+  --color-border-primary: rgba(0,0,0,0.35);
+  --color-border-warning: #EF9F27;
+  --color-border-danger: #E24B4A;
+  --color-background-info: #E6F1FB;
+  --color-background-secondary-solid: #f5f5f4;
+  --border-radius-md: 8px;
+  --border-radius-lg: 12px;
+  --font-sans: system-ui, -apple-system, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-background-primary: #1e1e1c;
+    --color-background-secondary: #2a2a28;
+    --color-background-tertiary: #242422;
+    --color-text-primary: #f0ede6;
+    --color-text-secondary: #a8a8a2;
+    --color-text-tertiary: #6e6e6a;
+    --color-text-info: #B5D4F4;
+    --color-text-warning: #FAC775;
+    --color-text-danger: #F7C1C1;
+    --color-border-tertiary: rgba(255,255,255,0.1);
+    --color-border-secondary: rgba(255,255,255,0.2);
+    --color-border-primary: rgba(255,255,255,0.35);
+    --color-background-info: #0C447C;
+  }
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans); background: var(--color-background-tertiary); color: var(--color-text-primary); padding: 24px; max-width: 720px; margin: 0 auto; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+.app { padding: 0; }
+.nav { display: flex; gap: 2px; margin-bottom: 1.25rem; border-bottom: 0.5px solid var(--color-border-tertiary); }
+.nav-tab { font-size: 13px; padding: 8px 14px; border: none; background: transparent; color: var(--color-text-secondary); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -0.5px; border-radius: 0; font-family: var(--font-sans); }
+.nav-tab.active { color: var(--color-text-primary); border-bottom-color: #185FA5; font-weight: 500; }
+.nav-tab:hover:not(.active) { color: var(--color-text-primary); }
+.toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 1.25rem; flex-wrap: wrap; }
+.search-wrap { position: relative; flex: 1; min-width: 140px; max-width: 240px; }
+.search-wrap i { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); font-size: 15px; color: var(--color-text-tertiary); pointer-events: none; }
+input[type=text], input[type=date] { padding: 7px 10px; font-size: 13px; border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-secondary); background: var(--color-background-primary); color: var(--color-text-primary); width: 100%; font-family: var(--font-sans); }
+input[type=date] { color-scheme: light dark; }
+#search { padding: 7px 10px 7px 30px; }
+select { font-size: 13px; padding: 7px 10px; border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-secondary); background: var(--color-background-primary); color: var(--color-text-primary); cursor: pointer; font-family: var(--font-sans); }
+textarea { font-size: 13px; padding: 7px 10px; border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-secondary); background: var(--color-background-secondary); color: var(--color-text-primary); width: 100%; resize: vertical; font-family: var(--font-sans); }
+.btn-primary { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; padding: 7px 14px; border-radius: var(--border-radius-md); border: none; background: #185FA5; color: #fff; cursor: pointer; white-space: nowrap; font-weight: 500; font-family: var(--font-sans); }
+.btn-primary:hover { background: #0C447C; }
+.btn-outline { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; padding: 7px 14px; border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-secondary); background: transparent; color: var(--color-text-primary); cursor: pointer; white-space: nowrap; font-family: var(--font-sans); }
+.btn-outline:hover { background: var(--color-background-secondary); }
+.btn-ghost { font-size: 13px; padding: 7px 12px; border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-secondary); background: transparent; color: var(--color-text-secondary); cursor: pointer; font-family: var(--font-sans); }
+.btn-ghost:hover { color: var(--color-text-danger); border-color: var(--color-border-danger); }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 10px; margin-bottom: 1.25rem; }
+.stat { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 10px 12px; }
+.stat-label { font-size: 12px; color: var(--color-text-secondary); margin-bottom: 4px; }
+.stat-val { font-size: 20px; font-weight: 500; color: var(--color-text-primary); }
+.jobs-list, .docs-list { display: flex; flex-direction: column; gap: 10px; }
+.job-card { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 14px 16px; cursor: pointer; transition: border-color 0.15s; }
+.job-card:hover { border-color: var(--color-border-secondary); }
+.job-card.expanded { border-color: var(--color-border-primary); }
+.job-header { display: flex; align-items: flex-start; gap: 10px; }
+.job-icon { width: 36px; height: 36px; border-radius: 8px; background: var(--color-background-info); display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 500; color: var(--color-text-info); flex-shrink: 0; }
+.job-meta { flex: 1; min-width: 0; }
+.job-company { font-size: 13px; color: var(--color-text-secondary); margin-bottom: 1px; }
+.job-role { font-size: 15px; font-weight: 500; color: var(--color-text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.job-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
+.badge { font-size: 11px; font-weight: 500; padding: 3px 9px; border-radius: 20px; white-space: nowrap; }
+.s-phone { background: #E1F5EE; color: #0F6E56; } .s-technical { background: #E6F1FB; color: #185FA5; } .s-final { background: #EEEDFE; color: #3C3489; } .s-offer { background: #EAF3DE; color: #3B6D11; } .s-rejected { background: #FCEBEB; color: #A32D2D; } .s-ghosted { background: #F1EFE8; color: #5F5E5A; }
+@media (prefers-color-scheme: dark) { .s-phone { background: #085041; color: #9FE1CB; } .s-technical { background: #0C447C; color: #B5D4F4; } .s-final { background: #3C3489; color: #CECBF6; } .s-offer { background: #27500A; color: #C0DD97; } .s-rejected { background: #791F1F; color: #F7C1C1; } .s-ghosted { background: #444441; color: #D3D1C7; } }
+.doc-badge-resume { background: #EEEDFE; color: #3C3489; } .doc-badge-cover { background: #FAEEDA; color: #633806; }
+@media (prefers-color-scheme: dark) { .doc-badge-resume { background: #3C3489; color: #CECBF6; } .doc-badge-cover { background: #633806; color: #FAC775; } }
+.job-date { font-size: 12px; color: var(--color-text-tertiary); }
+.expand-section { margin-top: 12px; padding-top: 12px; border-top: 0.5px solid var(--color-border-tertiary); display: none; flex-direction: column; gap: 12px; }
+.job-card.expanded .expand-section { display: flex; }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field label { font-size: 12px; color: var(--color-text-secondary); }
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.field input, .field select { background: var(--color-background-secondary); }
+.reminder-row { display: flex; align-items: center; gap: 6px; font-size: 13px; padding: 6px 10px; background: var(--color-background-secondary); border-radius: var(--border-radius-md); }
+.reminder-row i { font-size: 15px; color: var(--color-text-info); }
+.reminder-text { flex: 1; color: var(--color-text-secondary); }
+.reminder-due { font-size: 12px; color: var(--color-text-tertiary); }
+.btn-row { display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
+.doc-card { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 14px 16px; }
+.doc-card-header { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.doc-icon { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+.doc-icon-resume { background: #EEEDFE; color: #534AB7; } .doc-icon-cover { background: #FAEEDA; color: #854F0B; }
+@media (prefers-color-scheme: dark) { .doc-icon-resume { background: #3C3489; color: #CECBF6; } .doc-icon-cover { background: #633806; color: #FAC775; } }
+.doc-name { font-size: 15px; font-weight: 500; color: var(--color-text-primary); flex: 1; }
+.doc-meta { font-size: 12px; color: var(--color-text-tertiary); margin-top: 2px; }
+.doc-expand { margin-top: 12px; padding-top: 12px; border-top: 0.5px solid var(--color-border-tertiary); display: none; flex-direction: column; gap: 12px; }
+.doc-card.expanded .doc-expand { display: flex; }
+.doc-edit-area { font-size: 13px; min-height: 160px; line-height: 1.6; }
+.link-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; padding: 3px 8px; border-radius: var(--border-radius-md); background: var(--color-background-info); color: var(--color-text-info); cursor: pointer; border: none; white-space: nowrap; font-family: var(--font-sans); }
+.linked-jobs { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.empty { text-align: center; padding: 3rem 1rem; color: var(--color-text-tertiary); font-size: 14px; }
+.empty i { font-size: 36px; display: block; margin-bottom: 10px; opacity: 0.4; }
+.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; z-index: 100; }
+.modal { background: var(--color-background-primary); border-radius: var(--border-radius-lg); border: 0.5px solid var(--color-border-secondary); padding: 20px 22px; width: min(460px, 90vw); max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+.modal h2 { font-size: 16px; font-weight: 500; color: var(--color-text-primary); }
+.hidden { display: none !important; }
+.section-divider { font-size: 12px; font-weight: 500; color: var(--color-text-tertiary); text-transform: uppercase; letter-spacing: 0.04em; margin: 4px 0 2px; }
+</style>
+</head>
+<body>
+<h2 class="sr-only">Job tracker — manage applications, cover letters, and resumes</h2>
+<div class="app">
+  <div class="nav">
+    <button class="nav-tab active" onclick="switchTab('jobs',this)" id="tab-jobs"><i class="ti ti-briefcase" aria-hidden="true" style="font-size:14px;margin-right:5px;vertical-align:-1px"></i>Applications</button>
+    <button class="nav-tab" onclick="switchTab('docs',this)" id="tab-docs"><i class="ti ti-files" aria-hidden="true" style="font-size:14px;margin-right:5px;vertical-align:-1px"></i>Documents</button>
+  </div>
+  <div id="view-jobs">
+    <div class="toolbar">
+      <span style="flex:1"></span>
+      <div class="search-wrap"><i class="ti ti-search" aria-hidden="true"></i><input id="search" type="text" placeholder="Search roles or companies…" oninput="renderJobs()"></div>
+      <select id="filter-status" onchange="renderJobs()">
+        <option value="">All statuses</option>
+        <option>Phone screen</option><option>Technical Interview</option><option>Final Interview</option><option>Offer</option><option>Rejected</option><option>Ghosted</option>
+      </select>
+      <button class="btn-outline" onclick="openAddJob()"><i class="ti ti-plus" aria-hidden="true"></i>Add job</button>
+    </div>
+    <div class="stats" id="stats"></div>
+    <div class="jobs-list" id="jobs-list"></div>
+  </div>
+  <div id="view-docs" class="hidden">
+    <div class="toolbar">
+      <span style="flex:1"></span>
+      <div class="search-wrap"><i class="ti ti-search" aria-hidden="true"></i><input id="doc-search" type="text" placeholder="Search documents…" oninput="renderDocs()"></div>
+      <select id="doc-filter" onchange="renderDocs()">
+        <option value="">All types</option>
+        <option value="resume">Resume</option>
+        <option value="cover">Cover letter</option>
+      </select>
+      <button class="btn-outline" onclick="openAddDoc()"><i class="ti ti-plus" aria-hidden="true"></i>Add document</button>
+    </div>
+    <div class="docs-list" id="docs-list"></div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="modal-job">
+  <div class="modal">
+    <h2>Add application</h2>
+    <div class="field"><label>Company *</label><input id="mj-company" placeholder="e.g. Acme Corp" /></div>
+    <div class="field"><label>Role *</label><input id="mj-role" placeholder="e.g. Senior Engineer" /></div>
+    <div class="field-row">
+      <div class="field"><label>Status</label><select id="mj-status"><option>Phone screen</option><option>Technical Interview</option><option>Final Interview</option><option>Offer</option><option>Rejected</option><option>Ghosted</option></select></div>
+      <div class="field"><label>Applied date</label><input id="mj-date" type="date" /></div>
+    </div>
+    <div class="field"><label>Notes</label><textarea id="mj-notes" placeholder="Salary, recruiter name, job link…" style="min-height:60px"></textarea></div>
+    <div class="btn-row"><button class="btn-ghost" onclick="closeModals()">Cancel</button><button class="btn-primary" onclick="saveNewJob()">Add application</button></div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="modal-doc">
+  <div class="modal">
+    <h2>Add document</h2>
+    <div class="field-row">
+      <div class="field"><label>Type</label><select id="md-type" onchange="updateDocModalLabel()"><option value="resume">Resume</option><option value="cover">Cover letter</option></select></div>
+      <div class="field"><label>Version / label</label><input id="md-name" placeholder="e.g. v3 — tech roles" /></div>
+    </div>
+    <div class="field">
+      <label>Link to applications (optional)</label>
+      <div id="md-job-checkboxes" style="display:flex;flex-direction:column;gap:6px;max-height:110px;overflow-y:auto;background:var(--color-background-secondary);border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);padding:8px 10px"></div>
+    </div>
+    <div class="field"><label id="md-content-label">Content</label><textarea id="md-content" style="min-height:140px" placeholder="Paste resume or cover letter text here…"></textarea></div>
+    <div class="btn-row"><button class="btn-ghost" onclick="closeModals()">Cancel</button><button class="btn-primary" onclick="saveNewDoc()">Save document</button></div>
+  </div>
+</div>
+
+<script>
+const STATUS_CLASS={'Phone screen':'s-phone','Technical Interview':'s-technical','Final Interview':'s-final','Offer':'s-offer','Rejected':'s-rejected','Ghosted':'s-ghosted'};
+const STATUSES=['Phone screen','Technical Interview','Final Interview','Offer','Rejected','Ghosted'];
+let expandedJob=null,expandedDoc=null;
+
+const seedJobs=[
+  {id:1,company:'Stripe',role:'Senior Frontend Engineer',status:'Technical Interview',applied:'2026-05-15',interview:'2026-06-18',followup:'2026-06-14',notes:'Spoke with Alex from recruiting. Stack: React + TypeScript. System design round next week.'},
+  {id:2,company:'Figma',role:'Product Engineer',status:'Final Interview',applied:'2026-05-02',interview:'2026-06-12',followup:'2026-06-11',notes:'Three rounds down. Panel interview with design + eng leads Thursday.'},
+  {id:3,company:'Linear',role:'Full-Stack Engineer',status:'Phone screen',applied:'2026-06-01',interview:'',followup:'2026-06-20',notes:'Reached out via LinkedIn. Intro call scheduled.'},
+  {id:4,company:'Vercel',role:'Developer Advocate',status:'Offer',applied:'2026-04-20',interview:'2026-05-30',followup:'',notes:'Offer: $165k + equity. Deadline Jun 20.'},
+  {id:5,company:'Notion',role:'Software Engineer II',status:'Ghosted',applied:'2026-04-10',interview:'',followup:'',notes:'Applied through careers page. No response after recruiter screen.'},
+  {id:6,company:'Loom',role:'Frontend Engineer',status:'Rejected',applied:'2026-05-25',interview:'2026-06-03',followup:'',notes:'Rejected after technical round.'},
+];
+const seedDocs=[
+  {id:101,type:'resume',name:'Software engineer — general',linkedJobs:[1,2,3,4,5,6],content:'Jane Doe\njane@example.com\n\nEXPERIENCE\nSenior Engineer, Acme Corp (2022–present)\nEngineer II, Startup Inc (2019–2022)\n\nEDUCATION\nB.S. Computer Science, State University, 2019\n\nSKILLS\nReact, TypeScript, Node.js, PostgreSQL',updated:'2026-06-01'},
+  {id:102,type:'cover',name:'Cover letter — Stripe',linkedJobs:[1],content:"Dear Stripe Hiring Team,\n\nI'm excited to apply for the Senior Frontend Engineer role.\n\nBest,\nJane Doe",updated:'2026-05-14'},
+  {id:103,type:'cover',name:'Cover letter — Figma',linkedJobs:[2],content:"Hi Figma Team,\n\nThe Product Engineer role appeals to me deeply.\n\nBest,\nJane Doe",updated:'2026-05-01'},
+];
+
+let jobs=JSON.parse(localStorage.getItem('jobs_v2')||'null')||seedJobs;
+let docs=JSON.parse(localStorage.getItem('docs_v1')||'null')||seedDocs;
+function saveJobs(){try{localStorage.setItem('jobs_v2',JSON.stringify(jobs))}catch(e){}}
+function saveDocs(){try{localStorage.setItem('docs_v1',JSON.stringify(docs))}catch(e){}}
+
+function initials(n){return n.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()}
+function fmtDate(d){if(!d)return'';const p=d.split('-');return`${p[1]}/${p[2]}/${p[0].slice(2)}`}
+function today(){return new Date().toISOString().slice(0,10)}
+function isOverdue(d){return d&&d<today()}
+function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function stop(e){e.stopPropagation()}
+
+function switchTab(tab,btn){
+  document.getElementById('view-jobs').classList.toggle('hidden',tab!=='jobs');
+  document.getElementById('view-docs').classList.toggle('hidden',tab!=='docs');
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  if(tab==='jobs')renderJobs();else renderDocs();
+}
+
+function renderStats(){
+  const el=document.getElementById('stats');
+  const active=jobs.filter(j=>!['Rejected','Ghosted'].includes(j.status)).length;
+  const offers=jobs.filter(j=>j.status==='Offer').length;
+  const due=jobs.filter(j=>j.followup&&j.followup<=today()&&!['Rejected','Ghosted','Offer'].includes(j.status)).length;
+  el.innerHTML=`<div class="stat"><div class="stat-label">Total</div><div class="stat-val">${jobs.length}</div></div><div class="stat"><div class="stat-label">Active</div><div class="stat-val">${active}</div></div><div class="stat"><div class="stat-label">Offers</div><div class="stat-val">${offers}</div></div><div class="stat"><div class="stat-label">Follow-ups due</div><div class="stat-val" style="color:${due>0?'var(--color-text-warning)':'var(--color-text-primary)'}">${due}</div></div>`;
+}
+
+function renderJobs(){
+  renderStats();
+  const q=document.getElementById('search').value.toLowerCase();
+  const sf=document.getElementById('filter-status').value;
+  const list=document.getElementById('jobs-list');
+  const filtered=jobs.filter(j=>(!q||(j.company+j.role).toLowerCase().includes(q))&&(!sf||j.status===sf));
+  if(!filtered.length){list.innerHTML=`<div class="empty"><i class="ti ti-inbox" aria-hidden="true"></i>No applications found</div>`;return;}
+  list.innerHTML=filtered.map(j=>{
+    const sc=STATUS_CLASS[j.status]||'s-ghosted';
+    const isExp=expandedJob===j.id;
+    const overdue=isOverdue(j.followup)&&!['Rejected','Ghosted','Offer'].includes(j.status);
+    const linkedDocs=docs.filter(d=>d.linkedJobs&&d.linkedJobs.includes(j.id));
+    return`<div class="job-card${isExp?' expanded':''}" id="jcard-${j.id}" onclick="toggleJob(${j.id},event)">
+      <div class="job-header">
+        <div class="job-icon">${initials(j.company)}</div>
+        <div class="job-meta"><div class="job-company">${esc(j.company)}</div><div class="job-role">${esc(j.role)}</div></div>
+        <div class="job-right"><span class="badge ${sc}">${j.status}</span>${j.applied?`<span class="job-date">Applied ${fmtDate(j.applied)}</span>`:''}</div>
+      </div>
+      <div class="expand-section">
+        <div class="field-row">
+          <div class="field"><label>Company</label><input value="${esc(j.company)}" oninput="updateJob(${j.id},'company',this.value)" onclick="stop(event)" /></div>
+          <div class="field"><label>Role</label><input value="${esc(j.role)}" oninput="updateJob(${j.id},'role',this.value)" onclick="stop(event)" /></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Status</label><select onchange="updateJob(${j.id},'status',this.value)" onclick="stop(event)">${STATUSES.map(s=>`<option${s===j.status?' selected':''}>${s}</option>`).join('')}</select></div>
+          <div class="field"><label>Applied</label><input type="date" value="${j.applied||''}" oninput="updateJob(${j.id},'applied',this.value)" onclick="stop(event)" /></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Interview date</label><input type="date" value="${j.interview||''}" oninput="updateJob(${j.id},'interview',this.value)" onclick="stop(event)" /></div>
+          <div class="field"><label style="${overdue?'color:var(--color-text-warning)':''}">Follow-up${overdue?' ⚠':''}</label><input type="date" value="${j.followup||''}" oninput="updateJob(${j.id},'followup',this.value)" onclick="stop(event)" style="${overdue?'border-color:var(--color-border-warning)':''}" /></div>
+        </div>
+        ${j.interview?`<div class="reminder-row"><i class="ti ti-calendar-event" aria-hidden="true"></i><span class="reminder-text">Interview scheduled</span><span class="reminder-due">${fmtDate(j.interview)}</span></div>`:''}
+        <div class="field"><label>Notes</label><textarea oninput="updateJob(${j.id},'notes',this.value)" onclick="stop(event)">${esc(j.notes||'')}</textarea></div>
+        ${linkedDocs.length?`<div><div class="section-divider" style="margin-bottom:6px">Linked documents</div><div class="linked-jobs">${linkedDocs.map(d=>`<button class="link-chip" onclick="stop(event);jumpToDoc(${d.id})"><i class="ti ti-${d.type==='resume'?'file-text':'mail'}" aria-hidden="true" style="font-size:13px"></i>${esc(d.name)}</button>`).join('')}</div></div>`:''}
+        <div class="btn-row"><button class="btn-ghost" onclick="deleteJob(${j.id},event)"><i class="ti ti-trash" aria-hidden="true"></i> Delete</button></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleJob(id,e){expandedJob=expandedJob===id?null:id;renderJobs()}
+function updateJob(id,field,val){const j=jobs.find(j=>j.id===id);if(j){j[field]=val;saveJobs();renderStats()}}
+function deleteJob(id,e){stop(e);jobs=jobs.filter(j=>j.id!==id);docs.forEach(d=>{if(d.linkedJobs)d.linkedJobs=d.linkedJobs.filter(x=>x!==id)});if(expandedJob===id)expandedJob=null;saveJobs();saveDocs();renderJobs()}
+
+function renderDocs(){
+  const q=(document.getElementById('doc-search').value||'').toLowerCase();
+  const tf=document.getElementById('doc-filter').value;
+  const list=document.getElementById('docs-list');
+  const filtered=docs.filter(d=>(!q||d.name.toLowerCase().includes(q)||d.content.toLowerCase().includes(q))&&(!tf||d.type===tf));
+  if(!filtered.length){list.innerHTML=`<div class="empty"><i class="ti ti-files" aria-hidden="true"></i>No documents yet</div>`;return;}
+  list.innerHTML=filtered.map(d=>{
+    const isExp=expandedDoc===d.id;
+    const isResume=d.type==='resume';
+    const linked=jobs.filter(j=>d.linkedJobs&&d.linkedJobs.includes(j.id));
+    const preview=d.content?d.content.slice(0,120).replace(/\n/g,' ')+'…':'No content yet.';
+    return`<div class="doc-card${isExp?' expanded':''}" id="dcard-${d.id}">
+      <div class="doc-card-header" onclick="toggleDoc(${d.id})">
+        <div class="doc-icon ${isResume?'doc-icon-resume':'doc-icon-cover'}"><i class="ti ti-${isResume?'file-text':'mail'}" aria-hidden="true"></i></div>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px"><span class="doc-name">${esc(d.name)}</span><span class="badge ${isResume?'doc-badge-resume':'doc-badge-cover'}">${isResume?'Resume':'Cover letter'}</span></div>
+          <div class="doc-meta">${isExp?'':preview}</div>
+        </div>
+        <div style="font-size:12px;color:var(--color-text-tertiary);flex-shrink:0;margin-left:8px">${d.updated?fmtDate(d.updated):''}</div>
+      </div>
+      <div class="doc-expand">
+        <div class="field-row">
+          <div class="field"><label>Type</label><select onchange="updateDoc(${d.id},'type',this.value)" onclick="stop(event)"><option value="resume"${d.type==='resume'?' selected':''}>Resume</option><option value="cover"${d.type==='cover'?' selected':''}>Cover letter</option></select></div>
+          <div class="field"><label>Version / label</label><input value="${esc(d.name)}" oninput="updateDoc(${d.id},'name',this.value)" onclick="stop(event)" /></div>
+        </div>
+        <div class="field"><label>Content</label><textarea class="doc-edit-area" oninput="updateDoc(${d.id},'content',this.value)" onclick="stop(event)">${esc(d.content||'')}</textarea></div>
+        <div>
+          <div class="section-divider" style="margin-bottom:6px">Link to applications</div>
+          <div style="display:flex;flex-direction:column;gap:5px;max-height:130px;overflow-y:auto">
+            ${jobs.length?jobs.map(j=>{const checked=d.linkedJobs&&d.linkedJobs.includes(j.id);return`<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--color-text-secondary);cursor:pointer" onclick="stop(event)"><input type="checkbox" ${checked?'checked':''} onchange="toggleDocJob(${d.id},${j.id},this.checked)" style="width:auto" /><span>${esc(j.company)} — ${esc(j.role)}</span><span class="badge ${STATUS_CLASS[j.status]||'s-ghosted'}" style="margin-left:auto">${j.status}</span></label>`}).join(''):`<span style="font-size:13px;color:var(--color-text-tertiary)">No applications yet.</span>`}
+          </div>
+        </div>
+        ${linked.length?`<div><div class="section-divider" style="margin-bottom:6px">Linked to</div><div class="linked-jobs">${linked.map(j=>`<span style="font-size:12px;padding:3px 8px;border-radius:var(--border-radius-md);background:var(--color-background-secondary);color:var(--color-text-secondary)">${esc(j.company)} — ${esc(j.role)}</span>`).join('')}</div></div>`:''}
+        <div class="btn-row"><button class="btn-ghost" onclick="deleteDoc(${d.id},event)"><i class="ti ti-trash" aria-hidden="true"></i> Delete</button></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleDoc(id){expandedDoc=expandedDoc===id?null:id;renderDocs()}
+function updateDoc(id,field,val){const d=docs.find(d=>d.id===id);if(d){d[field]=val;if(field==='content')d.updated=today();saveDocs();if(field!=='content')renderDocs()}}
+function toggleDocJob(docId,jobId,checked){const d=docs.find(d=>d.id===docId);if(!d)return;if(!d.linkedJobs)d.linkedJobs=[];if(checked){if(!d.linkedJobs.includes(jobId))d.linkedJobs.push(jobId)}else{d.linkedJobs=d.linkedJobs.filter(x=>x!==jobId)}saveDocs()}
+function deleteDoc(id,e){stop(e);docs=docs.filter(d=>d.id!==id);if(expandedDoc===id)expandedDoc=null;saveDocs();renderDocs()}
+
+function jumpToDoc(id){
+  switchTab('docs',document.getElementById('tab-docs'));
+  expandedDoc=id;renderDocs();
+  setTimeout(()=>{const el=document.getElementById('dcard-'+id);if(el)el.scrollIntoView({behavior:'smooth',block:'start'})},80);
+}
+
+function openAddJob(){
+  document.getElementById('mj-company').value='';document.getElementById('mj-role').value='';
+  document.getElementById('mj-status').value='Phone screen';document.getElementById('mj-date').value=today();
+  document.getElementById('mj-notes').value='';document.getElementById('modal-job').classList.remove('hidden');
+}
+function saveNewJob(){
+  const c=document.getElementById('mj-company').value.trim();const r=document.getElementById('mj-role').value.trim();
+  if(!c||!r)return;
+  const id=Date.now();jobs.unshift({id,company:c,role:r,status:document.getElementById('mj-status').value,applied:document.getElementById('mj-date').value,interview:'',followup:'',notes:document.getElementById('mj-notes').value});
+  expandedJob=id;saveJobs();closeModals();renderJobs();
+}
+function updateDocModalLabel(){document.getElementById('md-content-label').textContent=document.getElementById('md-type').value==='resume'?'Resume content':'Cover letter content'}
+function openAddDoc(){
+  document.getElementById('md-type').value='resume';document.getElementById('md-name').value='';document.getElementById('md-content').value='';updateDocModalLabel();
+  const cb=document.getElementById('md-job-checkboxes');
+  cb.innerHTML=jobs.length?jobs.map(j=>`<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--color-text-secondary);cursor:pointer"><input type="checkbox" data-jid="${j.id}" style="width:auto" /><span>${esc(j.company)} — ${esc(j.role)}</span><span class="badge ${STATUS_CLASS[j.status]||'s-ghosted'}" style="margin-left:auto">${j.status}</span></label>`).join(''):`<span style="font-size:13px;color:var(--color-text-tertiary)">No applications yet.</span>`;
+  document.getElementById('modal-doc').classList.remove('hidden');
+}
+function saveNewDoc(){
+  const n=document.getElementById('md-name').value.trim();if(!n)return;
+  const linked=[...document.querySelectorAll('#md-job-checkboxes input:checked')].map(i=>parseInt(i.dataset.jid));
+  const id=Date.now();docs.unshift({id,type:document.getElementById('md-type').value,name:n,content:document.getElementById('md-content').value,linkedJobs:linked,updated:today()});
+  expandedDoc=id;saveDocs();closeModals();switchTab('docs',document.getElementById('tab-docs'));renderDocs();
+}
+function closeModals(){document.getElementById('modal-job').classList.add('hidden');document.getElementById('modal-doc').classList.add('hidden')}
+document.getElementById('modal-job').addEventListener('click',function(e){if(e.target===this)closeModals()});
+document.getElementById('modal-doc').addEventListener('click',function(e){if(e.target===this)closeModals()});
+renderJobs();
+</script>
+</body>
+</html>
