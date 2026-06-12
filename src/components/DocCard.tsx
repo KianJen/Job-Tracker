@@ -1,3 +1,4 @@
+import { useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { useStore } from '../store/useStore'
 import { fmtDate } from '../utils/dates'
@@ -7,10 +8,12 @@ import type { Doc } from '../types'
 interface Props { doc: Doc }
 
 export function DocCard({ doc }: Props) {
-  const { expandedDoc, setExpandedDoc, updateDoc, toggleDocJob, deleteDoc, jobs } = useStore(useShallow(s => ({
+  const { expandedDoc, setExpandedDoc, updateDoc, uploadDocFile, removeDocFile, toggleDocJob, deleteDoc, jobs } = useStore(useShallow(s => ({
     expandedDoc: s.expandedDoc,
     setExpandedDoc: s.setExpandedDoc,
     updateDoc: s.updateDoc,
+    uploadDocFile: s.uploadDocFile,
+    removeDocFile: s.removeDocFile,
     toggleDocJob: s.toggleDocJob,
     deleteDoc: s.deleteDoc,
     jobs: s.jobs,
@@ -20,6 +23,18 @@ export function DocCard({ doc }: Props) {
   const isResume = doc.type === 'resume'
   const linked = jobs.filter(j => doc.linkedJobs?.includes(j.id))
   const preview = doc.content ? doc.content.slice(0, 120).replace(/\n/g, ' ') + '…' : 'No content yet.'
+
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState(false)
+
+  async function onFilePicked(e: React.ChangeEvent<HTMLInputElement>) {
+    const picked = e.target.files?.[0]
+    if (fileRef.current) fileRef.current.value = ''
+    if (!picked) return
+    setUploading(true)
+    await uploadDocFile(doc.id, picked)
+    setUploading(false)
+  }
 
   return (
     <div className={`doc-card${isExp ? ' expanded' : ''}`} id={`dcard-${doc.id}`}>
@@ -36,6 +51,18 @@ export function DocCard({ doc }: Props) {
           </div>
           {!isExp && <div className="doc-meta">{preview}</div>}
         </div>
+        {doc.fileUrl && (
+          <a
+            href={doc.fileUrl}
+            target="_blank"
+            rel="noreferrer"
+            title={doc.fileName ?? 'Open file'}
+            onClick={e => e.stopPropagation()}
+            style={{ display: 'inline-flex', alignItems: 'center', color: 'var(--color-text-info)', flexShrink: 0, marginLeft: 8 }}
+          >
+            <i className="ti ti-paperclip" aria-hidden="true" style={{ fontSize: 16 }} />
+          </a>
+        )}
         <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', flexShrink: 0, marginLeft: 8 }}>
           {doc.updated ? fmtDate(doc.updated) : ''}
         </div>
@@ -56,21 +83,39 @@ export function DocCard({ doc }: Props) {
               <input type="text" defaultValue={doc.name} onChange={e => updateDoc(doc.id, 'name', e.target.value)} />
             </div>
           </div>
-          {doc.fileUrl && (
-            <div className="field">
-              <label>Attached file</label>
-              <a
-                href={doc.fileUrl}
-                target="_blank"
-                rel="noreferrer"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--color-text-info)', textDecoration: 'none', padding: '7px 10px', background: 'var(--color-background-secondary)', border: '0.5px solid var(--color-border-secondary)', borderRadius: 'var(--border-radius-md)', alignSelf: 'flex-start' }}
-              >
-                <i className="ti ti-paperclip" aria-hidden="true" style={{ fontSize: 14 }} />
-                {doc.fileName ?? 'Open file'}
-                <i className="ti ti-external-link" aria-hidden="true" style={{ fontSize: 12, opacity: 0.6 }} />
-              </a>
-            </div>
-          )}
+          <div className="field">
+            <label>Attached file (PDF or DOCX)</label>
+            {doc.fileUrl ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <a
+                  href={doc.fileUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--color-text-info)', textDecoration: 'none', padding: '7px 10px', background: 'var(--color-background-secondary)', border: '0.5px solid var(--color-border-secondary)', borderRadius: 'var(--border-radius-md)', flex: 1, minWidth: 0 }}
+                >
+                  <i className="ti ti-paperclip" aria-hidden="true" style={{ fontSize: 14, flexShrink: 0 }} />
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.fileName ?? 'Open file'}</span>
+                  <i className="ti ti-external-link" aria-hidden="true" style={{ fontSize: 12, opacity: 0.6, marginLeft: 'auto', flexShrink: 0 }} />
+                </a>
+                <button className="btn-outline" type="button" disabled={uploading} onClick={() => fileRef.current?.click()}>
+                  {uploading ? 'Uploading…' : 'Replace'}
+                </button>
+                <button className="btn-ghost" type="button" onClick={() => removeDocFile(doc.id)}>Remove</button>
+              </div>
+            ) : (
+              <button className="btn-outline" type="button" style={{ alignSelf: 'flex-start' }} disabled={uploading} onClick={() => fileRef.current?.click()}>
+                <i className="ti ti-upload" aria-hidden="true" />
+                {uploading ? 'Uploading…' : 'Attach PDF or DOCX'}
+              </button>
+            )}
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              style={{ display: 'none' }}
+              onChange={onFilePicked}
+            />
+          </div>
           <div className="field">
             <label>Notes</label>
             <textarea

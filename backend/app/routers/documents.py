@@ -113,7 +113,13 @@ async def upload_document_file(
 
     old_key = doc.file_key
     key = f"documents/{doc_id}/{uuid4().hex}-{file.filename}"
-    await run_in_threadpool(storage.upload_bytes, contents, key, file.content_type)
+    try:
+        await run_in_threadpool(storage.upload_bytes, contents, key, file.content_type)
+    except Exception as exc:  # noqa: BLE001 — surface storage failures to the client
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Could not store file in object storage: {exc}",
+        )
 
     doc.file_key = key
     doc.file_name = file.filename
@@ -123,7 +129,10 @@ async def upload_document_file(
     await db.refresh(doc, attribute_names=["jobs"])
 
     if old_key and old_key != key:
-        await run_in_threadpool(storage.delete_object, old_key)
+        try:
+            await run_in_threadpool(storage.delete_object, old_key)
+        except Exception:  # noqa: BLE001 — best-effort cleanup of the replaced file
+            pass
 
     return serialize_document(doc, settings.public_base_url)
 
@@ -134,7 +143,13 @@ async def download_document_file(doc_id: int, db: AsyncSession = Depends(get_db)
     if not doc.file_key:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No file attached")
 
-    data = await run_in_threadpool(storage.get_object_bytes, doc.file_key)
+    try:
+        data = await run_in_threadpool(storage.get_object_bytes, doc.file_key)
+    except Exception as exc:  # noqa: BLE001 — surface storage failures to the client
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Could not read file from object storage: {exc}",
+        )
     filename = doc.file_name or "document"
     return Response(
         content=data,

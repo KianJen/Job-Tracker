@@ -46,6 +46,7 @@ interface StoreState {
   addDoc: (type: 'resume' | 'cover', name: string, content: string, linkedJobs: number[]) => Promise<number | null>
   updateDoc: (id: number, field: keyof Doc, val: string) => void
   uploadDocFile: (id: number, file: File) => Promise<void>
+  removeDocFile: (id: number) => Promise<void>
   toggleDocJob: (docId: number, jobId: number, checked: boolean) => void
   deleteDoc: (id: number) => Promise<void>
 
@@ -150,6 +151,15 @@ export const useStore = create<StoreState>((set, get) => ({
       set({ docs: get().docs.map(d => d.id === id ? updated : d) })
     } catch (e) {
       set({ error: e instanceof Error ? e.message : 'Failed to upload file' })
+    }
+  },
+
+  removeDocFile: async (id) => {
+    try {
+      const updated = await api.deleteDocFile(id)
+      set({ docs: get().docs.map(d => d.id === id ? updated : d) })
+    } catch (e) {
+      set({ error: e instanceof Error ? e.message : 'Failed to remove file' })
     }
   },
 

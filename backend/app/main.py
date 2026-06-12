@@ -1,8 +1,9 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from . import storage
 from .config import settings
@@ -30,6 +31,19 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    # Unhandled exceptions bypass CORSMiddleware in Starlette, so the browser
+    # would otherwise see an opaque "Failed to fetch" instead of the real error.
+    # Echo the CORS headers here so the actual message reaches the frontend.
+    origin = request.headers.get("origin")
+    headers = {}
+    if origin and origin in settings.cors_origins:
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
+    return JSONResponse(status_code=500, content={"detail": str(exc)}, headers=headers)
+
 
 app.include_router(jobs.router)
 app.include_router(documents.router)
