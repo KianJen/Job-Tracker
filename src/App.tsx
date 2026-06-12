@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { useStore, STATUSES_LIST } from './store/useStore'
 import { StatsBar } from './components/StatsBar'
@@ -8,11 +8,15 @@ import { JobModal } from './components/JobModal'
 import { DocModal } from './components/DocModal'
 
 export default function App() {
-  const { tab, setTab, jobs, docs, jobSearch, setJobSearch, jobStatusFilter, setJobStatusFilter, docSearch, setDocSearch, docTypeFilter, setDocTypeFilter } = useStore(useShallow(s => ({
+  const { tab, setTab, jobs, docs, loading, error, load, setError, jobSearch, setJobSearch, jobStatusFilter, setJobStatusFilter, docSearch, setDocSearch, docTypeFilter, setDocTypeFilter } = useStore(useShallow(s => ({
     tab: s.tab,
     setTab: s.setTab,
     jobs: s.jobs,
     docs: s.docs,
+    loading: s.loading,
+    error: s.error,
+    load: s.load,
+    setError: s.setError,
     jobSearch: s.jobSearch,
     setJobSearch: s.setJobSearch,
     jobStatusFilter: s.jobStatusFilter,
@@ -25,6 +29,8 @@ export default function App() {
 
   const [showJobModal, setShowJobModal] = useState(false)
   const [showDocModal, setShowDocModal] = useState(false)
+
+  useEffect(() => { load() }, [load])
 
   const filteredJobs = jobs.filter(j =>
     (!jobSearch || (j.company + j.role).toLowerCase().includes(jobSearch.toLowerCase())) &&
@@ -39,6 +45,14 @@ export default function App() {
   return (
     <>
       <h2 className="sr-only">Job tracker — manage applications, cover letters, and resumes</h2>
+
+      {error && (
+        <div role="alert" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '1rem', padding: '9px 12px', fontSize: 13, background: 'var(--color-background-info)', border: '0.5px solid var(--color-border-danger)', borderRadius: 'var(--border-radius-md)', color: 'var(--color-text-danger)' }}>
+          <i className="ti ti-alert-triangle" aria-hidden="true" />
+          <span style={{ flex: 1 }}>{error}</span>
+          <button type="button" onClick={() => setError(null)} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 13 }}>Dismiss</button>
+        </div>
+      )}
 
       <nav className="nav">
         <button className={`nav-tab${tab === 'jobs' ? ' active' : ''}`} onClick={() => setTab('jobs')}>
@@ -69,9 +83,11 @@ export default function App() {
           </div>
           <StatsBar />
           <div className="jobs-list">
-            {filteredJobs.length === 0
-              ? <div className="empty"><i className="ti ti-inbox" aria-hidden="true" />No applications found</div>
-              : filteredJobs.map(j => <JobCard key={j.id} job={j} />)
+            {loading
+              ? <div className="empty"><i className="ti ti-loader" aria-hidden="true" />Loading…</div>
+              : filteredJobs.length === 0
+                ? <div className="empty"><i className="ti ti-inbox" aria-hidden="true" />No applications found</div>
+                : filteredJobs.map(j => <JobCard key={j.id} job={j} />)
             }
           </div>
         </div>
@@ -95,9 +111,11 @@ export default function App() {
             </button>
           </div>
           <div className="docs-list">
-            {filteredDocs.length === 0
-              ? <div className="empty"><i className="ti ti-files" aria-hidden="true" />No documents yet</div>
-              : filteredDocs.map(d => <DocCard key={d.id} doc={d} />)
+            {loading
+              ? <div className="empty"><i className="ti ti-loader" aria-hidden="true" />Loading…</div>
+              : filteredDocs.length === 0
+                ? <div className="empty"><i className="ti ti-files" aria-hidden="true" />No documents yet</div>
+                : filteredDocs.map(d => <DocCard key={d.id} doc={d} />)
             }
           </div>
         </div>

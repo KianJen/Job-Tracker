@@ -6,14 +6,13 @@ import { STATUS_CLASS } from '../utils/status'
 interface Props { onClose: () => void }
 
 export function DocModal({ onClose }: Props) {
-  const { addDoc, jobs } = useStore(useShallow(s => ({ addDoc: s.addDoc, jobs: s.jobs })))
+  const { addDoc, uploadDocFile, jobs } = useStore(useShallow(s => ({ addDoc: s.addDoc, uploadDocFile: s.uploadDocFile, jobs: s.jobs })))
   const [type, setType] = useState<'resume' | 'cover'>('resume')
   const [name, setName] = useState('')
   const [content, setContent] = useState('')
   const [linked, setLinked] = useState<number[]>([])
-  const [fileName, setFileName] = useState('')
-  const [fileUrl, setFileUrl] = useState('')
-  const [uploading, setUploading] = useState(false)
+  const [file, setFile] = useState<File | null>(null)
+  const [saving, setSaving] = useState(false)
   const overlayRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -22,25 +21,22 @@ export function DocModal({ onClose }: Props) {
   }
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setUploading(true)
-    const reader = new FileReader()
-    reader.onload = () => {
-      setFileUrl(reader.result as string)
-      setFileName(file.name)
-      if (!name.trim()) setName(file.name.replace(/\.(pdf|docx)$/i, ''))
-      setUploading(false)
-    }
-    reader.onerror = () => setUploading(false)
-    reader.readAsDataURL(file)
+    const picked = e.target.files?.[0]
+    if (!picked) return
+    setFile(picked)
+    if (!name.trim()) setName(picked.name.replace(/\.(pdf|docx)$/i, ''))
     if (fileRef.current) fileRef.current.value = ''
   }
 
-  function save() {
-    if (!name.trim()) return
-    addDoc(type, name.trim(), content, linked, fileName || undefined, fileUrl || undefined)
-    onClose()
+  async function save() {
+    if (!name.trim() || saving) return
+    setSaving(true)
+    const id = await addDoc(type, name.trim(), content, linked)
+    if (id != null && file) {
+      await uploadDocFile(id, file)
+    }
+    setSaving(false)
+    if (id != null) onClose()
   }
 
   const contentLabel = type === 'resume' ? 'Resume content' : 'Cover letter content'
@@ -64,14 +60,14 @@ export function DocModal({ onClose }: Props) {
         </div>
         <div className="field">
           <label>Attach file (PDF or DOCX)</label>
-          {fileUrl ? (
+          {file ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', background: 'var(--color-background-secondary)', border: '0.5px solid var(--color-border-secondary)', borderRadius: 'var(--border-radius-md)' }}>
               <i className="ti ti-paperclip" aria-hidden="true" style={{ color: 'var(--color-text-tertiary)', fontSize: 14 }} />
-              <span style={{ fontSize: 13, color: 'var(--color-text-secondary)', flex: 1 }}>{fileName}</span>
+              <span style={{ fontSize: 13, color: 'var(--color-text-secondary)', flex: 1 }}>{file.name}</span>
               <button
                 type="button"
                 style={{ fontSize: 12, background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', padding: 0 }}
-                onClick={() => { setFileUrl(''); setFileName('') }}
+                onClick={() => setFile(null)}
               >
                 Remove
               </button>
@@ -81,11 +77,10 @@ export function DocModal({ onClose }: Props) {
               className="btn-outline"
               style={{ alignSelf: 'flex-start' }}
               onClick={() => fileRef.current?.click()}
-              disabled={uploading}
               type="button"
             >
               <i className="ti ti-upload" aria-hidden="true" />
-              {uploading ? 'Loading…' : 'Upload PDF or DOCX'}
+              Upload PDF or DOCX
             </button>
           )}
           <input
@@ -122,7 +117,9 @@ export function DocModal({ onClose }: Props) {
         </div>
         <div className="btn-row">
           <button className="btn-ghost" onClick={onClose}>Cancel</button>
-          <button className="btn-primary" onClick={save} disabled={uploading}>Save document</button>
+          <button className="btn-primary" onClick={save} disabled={saving}>
+            {saving ? 'Saving…' : 'Save document'}
+          </button>
         </div>
       </div>
     </div>

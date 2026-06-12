@@ -1,37 +1,25 @@
 import { create } from 'zustand'
 import type { Job, Doc, Status } from '../types'
 import { today } from '../utils/dates'
+import { api } from '../api/client'
 
 const STATUSES: Status[] = [
   'Phone screen', 'Technical Interview', 'Final Interview',
   'Offer', 'Rejected', 'Ghosted',
 ]
 
-const seedJobs: Job[] = [
-  { id: 1, company: 'Stripe', role: 'Senior Frontend Engineer', status: 'Technical Interview', applied: '2026-05-15', interview: '2026-06-18', followup: '2026-06-14', notes: 'Spoke with Alex from recruiting. Stack: React + TypeScript. System design round next week.' },
-  { id: 2, company: 'Figma', role: 'Product Engineer', status: 'Final Interview', applied: '2026-05-02', interview: '2026-06-12', followup: '2026-06-11', notes: 'Three rounds down. Panel interview with design + eng leads Thursday.' },
-  { id: 3, company: 'Linear', role: 'Full-Stack Engineer', status: 'Phone screen', applied: '2026-06-01', interview: '', followup: '2026-06-20', notes: 'Reached out via LinkedIn. Intro call scheduled.' },
-  { id: 4, company: 'Vercel', role: 'Developer Advocate', status: 'Offer', applied: '2026-04-20', interview: '2026-05-30', followup: '', notes: 'Offer: $165k + equity. Deadline Jun 20.' },
-  { id: 5, company: 'Notion', role: 'Software Engineer II', status: 'Ghosted', applied: '2026-04-10', interview: '', followup: '', notes: 'Applied through careers page. No response after recruiter screen.' },
-  { id: 6, company: 'Loom', role: 'Frontend Engineer', status: 'Rejected', applied: '2026-05-25', interview: '2026-06-03', followup: '', notes: 'Rejected after technical round.' },
-]
-
-const seedDocs: Doc[] = [
-  { id: 101, type: 'resume', name: 'Software engineer — general', linkedJobs: [1,2,3,4,5,6], content: 'Jane Doe\njane@example.com\n\nEXPERIENCE\nSenior Engineer, Acme Corp (2022–present)\nEngineer II, Startup Inc (2019–2022)\n\nEDUCATION\nB.S. Computer Science, State University, 2019\n\nSKILLS\nReact, TypeScript, Node.js, PostgreSQL', updated: '2026-06-01' },
-  { id: 102, type: 'cover', name: 'Cover letter — Stripe', linkedJobs: [1], content: "Dear Stripe Hiring Team,\n\nI'm excited to apply for the Senior Frontend Engineer role.\n\nBest,\nJane Doe", updated: '2026-05-14' },
-  { id: 103, type: 'cover', name: 'Cover letter — Figma', linkedJobs: [2], content: "Hi Figma Team,\n\nThe Product Engineer role appeals to me deeply.\n\nBest,\nJane Doe", updated: '2026-05-01' },
-]
-
-function loadJobs(): Job[] {
-  try { return JSON.parse(localStorage.getItem('jobs_v2') || 'null') ?? seedJobs } catch { return seedJobs }
-}
-function loadDocs(): Doc[] {
-  try { return JSON.parse(localStorage.getItem('docs_v1') || 'null') ?? seedDocs } catch { return seedDocs }
+// Debounce network writes for fields edited keystroke-by-keystroke.
+const timers: Record<string, ReturnType<typeof setTimeout>> = {}
+function debounce(key: string, fn: () => void, ms = 500) {
+  clearTimeout(timers[key])
+  timers[key] = setTimeout(fn, ms)
 }
 
 interface StoreState {
   jobs: Job[]
   docs: Doc[]
+  loading: boolean
+  error: string | null
   tab: 'jobs' | 'docs'
   expandedJob: number | null
   expandedDoc: number | null
@@ -39,6 +27,9 @@ interface StoreState {
   jobStatusFilter: string
   docSearch: string
   docTypeFilter: string
+
+  load: () => Promise<void>
+  setError: (msg: string | null) => void
 
   setTab: (tab: 'jobs' | 'docs') => void
   setExpandedJob: (id: number | null) => void
@@ -48,14 +39,15 @@ interface StoreState {
   setDocSearch: (q: string) => void
   setDocTypeFilter: (t: string) => void
 
-  addJob: (company: string, role: string, status: Status, applied: string, notes: string) => number
+  addJob: (company: string, role: string, status: Status, applied: string, notes: string) => Promise<void>
   updateJob: (id: number, field: keyof Job, val: string) => void
-  deleteJob: (id: number) => void
+  deleteJob: (id: number) => Promise<void>
 
-  addDoc: (type: 'resume' | 'cover', name: string, content: string, linkedJobs: number[], fileName?: string, fileUrl?: string) => number
-  updateDoc: (id: number, field: keyof Doc, val: string | number[]) => void
+  addDoc: (type: 'resume' | 'cover', name: string, content: string, linkedJobs: number[]) => Promise<number | null>
+  updateDoc: (id: number, field: keyof Doc, val: string) => void
+  uploadDocFile: (id: number, file: File) => Promise<void>
   toggleDocJob: (docId: number, jobId: number, checked: boolean) => void
-  deleteDoc: (id: number) => void
+  deleteDoc: (id: number) => Promise<void>
 
   jumpToDoc: (id: number) => void
 }
@@ -63,8 +55,10 @@ interface StoreState {
 export const STATUSES_LIST = STATUSES
 
 export const useStore = create<StoreState>((set, get) => ({
-  jobs: loadJobs(),
-  docs: loadDocs(),
+  jobs: [],
+  docs: [],
+  loading: true,
+  error: null,
   tab: 'jobs',
   expandedJob: null,
   expandedDoc: null,
@@ -72,6 +66,18 @@ export const useStore = create<StoreState>((set, get) => ({
   jobStatusFilter: '',
   docSearch: '',
   docTypeFilter: '',
+
+  load: async () => {
+    set({ loading: true, error: null })
+    try {
+      const [jobs, docs] = await Promise.all([api.listJobs(), api.listDocs()])
+      set({ jobs, docs, loading: false })
+    } catch (e) {
+      set({ loading: false, error: e instanceof Error ? e.message : 'Failed to load data' })
+    }
+  },
+
+  setError: (msg) => set({ error: msg }),
 
   setTab: (tab) => set({ tab }),
   setExpandedJob: (id) => set({ expandedJob: id }),
@@ -81,62 +87,94 @@ export const useStore = create<StoreState>((set, get) => ({
   setDocSearch: (q) => set({ docSearch: q }),
   setDocTypeFilter: (t) => set({ docTypeFilter: t }),
 
-  addJob: (company, role, status, applied, notes) => {
-    const id = Date.now()
-    const jobs = [{ id, company, role, status, applied, interview: '', followup: '', notes }, ...get().jobs]
-    set({ jobs, expandedJob: id })
-    try { localStorage.setItem('jobs_v2', JSON.stringify(jobs)) } catch { /* */ }
-    return id
+  addJob: async (company, role, status, applied, notes) => {
+    try {
+      const job = await api.createJob({ company, role, status, applied, notes })
+      set({ jobs: [job, ...get().jobs], expandedJob: job.id })
+    } catch (e) {
+      set({ error: e instanceof Error ? e.message : 'Failed to add job' })
+    }
   },
 
   updateJob: (id, field, val) => {
-    const jobs = get().jobs.map(j => j.id === id ? { ...j, [field]: val } : j)
-    set({ jobs })
-    try { localStorage.setItem('jobs_v2', JSON.stringify(jobs)) } catch { /* */ }
+    // Optimistic local update for a responsive UI.
+    set({ jobs: get().jobs.map(j => j.id === id ? { ...j, [field]: val } : j) })
+    debounce(`job:${id}:${field}`, () => {
+      api.updateJob(id, { [field]: val }).catch(e =>
+        set({ error: e instanceof Error ? e.message : 'Failed to save changes' })
+      )
+    })
   },
 
-  deleteJob: (id) => {
-    const jobs = get().jobs.filter(j => j.id !== id)
-    const docs = get().docs.map(d => ({ ...d, linkedJobs: d.linkedJobs.filter(x => x !== id) }))
-    set({ jobs, docs, expandedJob: get().expandedJob === id ? null : get().expandedJob })
-    try { localStorage.setItem('jobs_v2', JSON.stringify(jobs)) } catch { /* */ }
-    try { localStorage.setItem('docs_v1', JSON.stringify(docs)) } catch { /* */ }
+  deleteJob: async (id) => {
+    try {
+      await api.deleteJob(id)
+      set({
+        jobs: get().jobs.filter(j => j.id !== id),
+        // Backend cascades the link removal; mirror that locally.
+        docs: get().docs.map(d => ({ ...d, linkedJobs: d.linkedJobs.filter(x => x !== id) })),
+        expandedJob: get().expandedJob === id ? null : get().expandedJob,
+      })
+    } catch (e) {
+      set({ error: e instanceof Error ? e.message : 'Failed to delete job' })
+    }
   },
 
-  addDoc: (type, name, content, linkedJobs, fileName, fileUrl) => {
-    const id = Date.now()
-    const docs = [{ id, type, name, content, linkedJobs, updated: today(), fileName, fileUrl }, ...get().docs]
-    set({ docs, expandedDoc: id, tab: 'docs' })
-    try { localStorage.setItem('docs_v1', JSON.stringify(docs)) } catch { /* */ }
-    return id
+  addDoc: async (type, name, content, linkedJobs) => {
+    try {
+      const doc = await api.createDoc({ type, name, content, linkedJobs })
+      set({ docs: [doc, ...get().docs], expandedDoc: doc.id, tab: 'docs' })
+      return doc.id
+    } catch (e) {
+      set({ error: e instanceof Error ? e.message : 'Failed to add document' })
+      return null
+    }
   },
 
   updateDoc: (id, field, val) => {
-    const docs = get().docs.map(d => {
-      if (d.id !== id) return d
-      const updated = field === 'content' ? today() : d.updated
-      return { ...d, [field]: val, updated }
+    set({
+      docs: get().docs.map(d =>
+        d.id === id ? { ...d, [field]: val, updated: today() } : d
+      ),
     })
-    set({ docs })
-    try { localStorage.setItem('docs_v1', JSON.stringify(docs)) } catch { /* */ }
+    debounce(`doc:${id}:${field}`, () => {
+      api.updateDoc(id, { [field]: val }).catch(e =>
+        set({ error: e instanceof Error ? e.message : 'Failed to save changes' })
+      )
+    })
+  },
+
+  uploadDocFile: async (id, file) => {
+    try {
+      const updated = await api.uploadDocFile(id, file)
+      set({ docs: get().docs.map(d => d.id === id ? updated : d) })
+    } catch (e) {
+      set({ error: e instanceof Error ? e.message : 'Failed to upload file' })
+    }
   },
 
   toggleDocJob: (docId, jobId, checked) => {
-    const docs = get().docs.map(d => {
-      if (d.id !== docId) return d
-      const linkedJobs = checked
-        ? [...new Set([...d.linkedJobs, jobId])]
-        : d.linkedJobs.filter(x => x !== jobId)
-      return { ...d, linkedJobs }
-    })
-    set({ docs })
-    try { localStorage.setItem('docs_v1', JSON.stringify(docs)) } catch { /* */ }
+    const doc = get().docs.find(d => d.id === docId)
+    if (!doc) return
+    const linkedJobs = checked
+      ? [...new Set([...doc.linkedJobs, jobId])]
+      : doc.linkedJobs.filter(x => x !== jobId)
+    set({ docs: get().docs.map(d => d.id === docId ? { ...d, linkedJobs } : d) })
+    api.updateDoc(docId, { linkedJobs }).catch(e =>
+      set({ error: e instanceof Error ? e.message : 'Failed to update links' })
+    )
   },
 
-  deleteDoc: (id) => {
-    const docs = get().docs.filter(d => d.id !== id)
-    set({ docs, expandedDoc: get().expandedDoc === id ? null : get().expandedDoc })
-    try { localStorage.setItem('docs_v1', JSON.stringify(docs)) } catch { /* */ }
+  deleteDoc: async (id) => {
+    try {
+      await api.deleteDoc(id)
+      set({
+        docs: get().docs.filter(d => d.id !== id),
+        expandedDoc: get().expandedDoc === id ? null : get().expandedDoc,
+      })
+    } catch (e) {
+      set({ error: e instanceof Error ? e.message : 'Failed to delete document' })
+    }
   },
 
   jumpToDoc: (id) => {

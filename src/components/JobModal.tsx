@@ -12,11 +12,14 @@ export function JobModal({ onClose }: Props) {
   const [status, setStatus] = useState<Status>('Phone screen')
   const [applied, setApplied] = useState(today())
   const [notes, setNotes] = useState('')
+  const [saving, setSaving] = useState(false)
   const overlayRef = useRef<HTMLDivElement>(null)
 
-  function save() {
-    if (!company.trim() || !role.trim()) return
-    addJob(company.trim(), role.trim(), status, applied, notes)
+  async function save() {
+    if (!company.trim() || !role.trim() || saving) return
+    setSaving(true)
+    await addJob(company.trim(), role.trim(), status, applied, notes)
+    setSaving(false)
     onClose()
   }
 
@@ -50,7 +53,9 @@ export function JobModal({ onClose }: Props) {
         </div>
         <div className="btn-row">
           <button className="btn-ghost" onClick={onClose}>Cancel</button>
-          <button className="btn-primary" onClick={save}>Add application</button>
+          <button className="btn-primary" onClick={save} disabled={saving}>
+            {saving ? 'Adding…' : 'Add application'}
+          </button>
         </div>
       </div>
     </div>
