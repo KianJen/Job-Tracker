@@ -1,0 +1,20 @@
+# Node / frontend
+node_modules/
+dist/
+*.local
+
+# Python / backend
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Env / secrets
+.env
+backend/.env
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
