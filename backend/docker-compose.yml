@@ -39,10 +39,18 @@ services:
       S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY}
       S3_BUCKET: job-tracker-docs
       S3_REGION: garage
-      PUBLIC_BASE_URL: http://localhost:8000
-      CORS_ORIGINS: '["http://localhost:5173"]'
+      # File download URLs point to nginx (port 80), not directly to the API.
+      PUBLIC_BASE_URL: http://${HOST_IP:-localhost}
+      CORS_ORIGINS: '["http://${HOST_IP:-localhost}"]'
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    depends_on:
+      - api
     ports:
-      - "8000:8000"
+      - "80:80"
 
 volumes:
   pgdata:
