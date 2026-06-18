@@ -1,3 +1,8 @@
+# Pin the project name so deploys from any directory (e.g. the CI runner's
+# checkout) reuse the same containers and named volumes instead of creating
+# a second, empty stack.
+name: backend
+
 services:
   postgres:
     image: postgres:16-alpine
