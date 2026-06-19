@@ -86,5 +86,6 @@ uvicorn app.main:app --reload
   reverse-proxy auth layer) before exposing this publicly.
 - **Schema** is created on startup via `Base.metadata.create_all`. For evolving the schema
   over time, switch to **Alembic** migrations.
-- The frontend still uses `localStorage`; wiring it to this API (replacing the Zustand
-  persistence layer with `fetch` calls) is the next step.
+- The frontend talks to this API via a typed `fetch` wrapper (`src/api/client.ts`); the
+  Zustand store loads data on mount and persists edits through the API (optimistic +
+  debounced). There is no more `localStorage` persistence.
