@@ -9,7 +9,7 @@ export function JobModal({ onClose }: Props) {
   const addJob = useStore(s => s.addJob)
   const [company, setCompany] = useState('')
   const [role, setRole] = useState('')
-  const [status, setStatus] = useState<Status>('Phone screen')
+  const [status, setStatus] = useState<Status>('Applied')
   const [applied, setApplied] = useState(today())
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)

@@ -1,4 +1,5 @@
 export type Status =
+  | 'Applied'
   | 'Phone screen'
   | 'Technical Interview'
   | 'Final Interview'

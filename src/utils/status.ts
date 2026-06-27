@@ -1,6 +1,7 @@
 import type { Status } from '../types'
 
 export const STATUS_CLASS: Record<Status, string> = {
+  'Applied': 's-applied',
   'Phone screen': 's-phone',
   'Technical Interview': 's-technical',
   'Final Interview': 's-final',

@@ -4,7 +4,7 @@ import { today } from '../utils/dates'
 import { api } from '../api/client'
 
 const STATUSES: Status[] = [
-  'Phone screen', 'Technical Interview', 'Final Interview',
+  'Applied', 'Phone screen', 'Technical Interview', 'Final Interview',
   'Offer', 'Rejected', 'Ghosted',
 ]
 

@@ -144,6 +144,7 @@ textarea {
 
 /* Badges */
 .badge { font-size: 11px; font-weight: 500; padding: 3px 9px; border-radius: 20px; white-space: nowrap; }
+.s-applied { background: #FBEFD9; color: #8A5512; }
 .s-phone { background: #E1F5EE; color: #0F6E56; }
 .s-technical { background: #E6F1FB; color: #185FA5; }
 .s-final { background: #EEEDFE; color: #3C3489; }
@@ -151,6 +152,7 @@ textarea {
 .s-rejected { background: #FCEBEB; color: #A32D2D; }
 .s-ghosted { background: #F1EFE8; color: #5F5E5A; }
 @media (prefers-color-scheme: dark) {
+  .s-applied { background: #5C3D0A; color: #F2D49B; }
   .s-phone { background: #085041; color: #9FE1CB; }
   .s-technical { background: #0C447C; color: #B5D4F4; }
   .s-final { background: #3C3489; color: #CECBF6; }
