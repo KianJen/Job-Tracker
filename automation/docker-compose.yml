@@ -1,0 +1,61 @@
+# Automation stack: n8n + Ollama, for the email -> tracker ingestion workflow.
+#
+# Kept separate from backend/docker-compose.yml on purpose:
+#   - it's not part of the CI/CD deploy (Ollama is heavy and stateful), and
+#   - it attaches to the backend stack's network so n8n can reach the API
+#     (http://api:8000) and Ollama (http://ollama:11434) by service name.
+#
+# Bring it up with:
+#   docker compose -f automation/docker-compose.yml up -d
+#
+# The backend stack must already be running (it owns the backend_default network).
+name: automation
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama_models:/root/.ollama
+    networks:
+      - backend_default
+    restart: unless-stopped
+    # Uncomment to reach Ollama from the host for debugging (n8n doesn't need it):
+    # ports:
+    #   - "11434:11434"
+    # If the mini PC has an NVIDIA GPU, uncomment to use it (needs nvidia-container-toolkit):
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+  n8n:
+    image: n8nio/n8n:latest
+    environment:
+      - N8N_HOST=${HOST_IP:-localhost}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=http://${HOST_IP:-localhost}:5678/
+      # Allow login over plain HTTP on the LAN (no TLS in front of n8n here):
+      - N8N_SECURE_COOKIE=false
+      - GENERIC_TIMEZONE=${TZ:-UTC}
+      - TZ=${TZ:-UTC}
+    ports:
+      - "5678:5678"
+    volumes:
+      - n8n_data:/home/node/.n8n
+    networks:
+      - backend_default
+    depends_on:
+      - ollama
+    restart: unless-stopped
+
+volumes:
+  ollama_models:
+  n8n_data:
+
+networks:
+  backend_default:
+    external: true

@@ -1,0 +1,129 @@
+{
+  "name": "Email → Tracker (Applied)",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": { "item": [ { "mode": "everyX", "value": 15, "unit": "minutes" } ] },
+        "simple": true,
+        "filters": {
+          "q": "newer_than:2d -label:tracked (subject:(\"application received\" OR \"thanks for applying\" OR \"we received your application\") OR from:(greenhouse.io OR lever.co OR myworkday.com OR ashbyhq.com))"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0],
+      "id": "a1b2c3d4-0001-4000-8000-000000000001",
+      "name": "Gmail Trigger",
+      "credentials": {
+        "gmailOAuth2": { "id": "REPLACE_WITH_YOUR_GMAIL_CREDENTIAL", "name": "Gmail account" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const subject = $json.subject || '';\nconst from = $json.from || '';\nconst text = ($json.text || $json.snippet || '').slice(0, 6000);\n\nconst system = \"You extract data from job-application emails. Decide if the email confirms that the user SUBMITTED an application (e.g. 'we received your application', 'thanks for applying'). It is NOT a confirmation if it is an interview invite, rejection, job alert, newsletter, or marketing. Extract the hiring company name and the job title. If a field is unknown or it is not a confirmation, use an empty string. Output only JSON.\";\n\nreturn [{ json: {\n  gmailId: $json.id,\n  subject,\n  ollamaBody: {\n    model: 'llama3.2:3b',\n    stream: false,\n    options: { temperature: 0 },\n    format: {\n      type: 'object',\n      properties: {\n        is_application_confirmation: { type: 'boolean' },\n        company: { type: 'string' },\n        role: { type: 'string' }\n      },\n      required: ['is_application_confirmation', 'company', 'role']\n    },\n    messages: [\n      { role: 'system', content: system },\n      { role: 'user', content: `Subject: ${subject}\\n\\nFrom: ${from}\\n\\nBody:\\n${text}` }\n    ]\n  }\n} }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0],
+      "id": "a1b2c3d4-0002-4000-8000-000000000002",
+      "name": "Build prompt"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://ollama:11434/api/chat",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.ollamaBody }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 0],
+      "id": "a1b2c3d4-0003-4000-8000-000000000003",
+      "name": "Extract (Ollama)"
+    },
+    {
+      "parameters": {
+        "jsCode": "const parsed = JSON.parse($json.message.content);\nreturn [{ json: {\n  ...parsed,\n  gmailId: $('Build prompt').item.json.gmailId,\n  subject: $('Build prompt').item.json.subject\n} }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 0],
+      "id": "a1b2c3d4-0004-4000-8000-000000000004",
+      "name": "Parse"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "id": "cond-1",
+              "leftValue": "={{ $json.is_application_confirmation }}",
+              "rightValue": "",
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            },
+            {
+              "id": "cond-2",
+              "leftValue": "={{ $json.company }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "notEmpty", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [880, 0],
+      "id": "a1b2c3d4-0005-4000-8000-000000000005",
+      "name": "Is confirmation?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:8000/api/jobs",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"company\": $json.company, \"role\": $json.role, \"status\": \"Applied\", \"applied\": $now.format('yyyy-LL-dd'), \"notes\": \"Auto-added from email\" } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1100, -100],
+      "id": "a1b2c3d4-0006-4000-8000-000000000006",
+      "name": "Create job"
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "addLabels",
+        "messageId": "={{ $('Parse').item.json.gmailId }}",
+        "labelIds": []
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [1320, -100],
+      "id": "a1b2c3d4-0007-4000-8000-000000000007",
+      "name": "Mark tracked",
+      "credentials": {
+        "gmailOAuth2": { "id": "REPLACE_WITH_YOUR_GMAIL_CREDENTIAL", "name": "Gmail account" }
+      }
+    }
+  ],
+  "connections": {
+    "Gmail Trigger": { "main": [ [ { "node": "Build prompt", "type": "main", "index": 0 } ] ] },
+    "Build prompt": { "main": [ [ { "node": "Extract (Ollama)", "type": "main", "index": 0 } ] ] },
+    "Extract (Ollama)": { "main": [ [ { "node": "Parse", "type": "main", "index": 0 } ] ] },
+    "Parse": { "main": [ [ { "node": "Is confirmation?", "type": "main", "index": 0 } ] ] },
+    "Is confirmation?": { "main": [ [ { "node": "Create job", "type": "main", "index": 0 } ], [] ] },
+    "Create job": { "main": [ [ { "node": "Mark tracked", "type": "main", "index": 0 } ] ] }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "pinData": {},
+  "meta": {}
+}
