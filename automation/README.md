@@ -142,11 +142,17 @@ The IMAP flow is `Email Trigger (IMAP) → Build prompt → Extract (Ollama) →
   > to whatever the Gmail Trigger actually outputs (check the node's output panel).
 
 ### 3) Parse — Code node
-Ollama returns the JSON as a string in `message.content`. Parse it:
+Ollama returns the JSON as a string in `message.content`. Parse **every** item (a single
+poll can return several emails — iterate `$input.all()` so none are dropped, and set
+`pairedItem` to keep item linkage intact):
 ```js
-const parsed = JSON.parse($json.message.content);
-return [{ json: parsed }];
+return $input.all().map((item, i) => ({
+  json: JSON.parse(item.json.message.content),
+  pairedItem: { item: i },
+}));
 ```
+> The same pattern applies to the *Build prompt* node — map over `$input.all()` rather than
+> reading `$json` (which is only the first item in "Run Once for All Items" mode).
 
 ### 4) IF confirmation — IF node
 Continue only on a real confirmation with a company name:
