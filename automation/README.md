@@ -52,24 +52,52 @@ docker exec -it automation-ollama-1 ollama run llama3.2:3b "Reply with the word 
 ## 3. Open n8n and connect Gmail
 
 1. Visit `http://<lxc-ip>:5678`, create the local owner account (stored only on your box).
-2. **Credentials → New → Gmail OAuth2.** You'll need a Google Cloud project with the Gmail
-   API enabled and an OAuth client (Desktop/Web). Paste the client ID/secret, authorize.
-   - Simpler alternative if OAuth is a hassle: use the **Email (IMAP)** trigger instead, with
-     `imap.gmail.com:993` and a Gmail **app password**. You lose label management (use
-     "mark as read" for dedup instead).
+2. Connect Gmail with **one** of these — pick IMAP if OAuth is being a pain:
+
+   **Option A — IMAP + app password (simplest).** No Google Cloud project needed.
+   - Enable 2-Step Verification, then create an **app password** at
+     <https://myaccount.google.com/apppasswords>.
+   - **Credentials → New → IMAP:** Host `imap.gmail.com`, Port `993`, SSL on, User = your
+     Gmail address, Password = the **app password** (not your normal password).
+   - Use the **IMAP workflow variant** in step 4. Dedup is by "mark as read" (the trigger
+     fetches only unread mail and marks it read), not Gmail labels.
+
+   **Option B — Gmail OAuth2.** Needs a Google Cloud project with the Gmail API enabled and an
+   OAuth client (Desktop/Web); paste the client ID/secret and authorize. Use the OAuth
+   workflow variant. Dedup is by the `tracked` Gmail label.
 
 ## 4. Import the workflow
 
-Import [`job-ingest.workflow.json`](job-ingest.workflow.json) (n8n: **Workflows → Import from File**),
-then open it and:
+Two variants ship here — import the one matching your auth choice
+(n8n: **Workflows → Import from File**):
 
-- Re-select your **Gmail credential** on the *Gmail Trigger* and *Mark tracked* nodes
-  (credential IDs don't survive import).
+| Auth | File | Dedup |
+|---|---|---|
+| IMAP (Option A) | [`job-ingest-imap.workflow.json`](job-ingest-imap.workflow.json) | mark-as-read on unread mail |
+| OAuth (Option B) | [`job-ingest.workflow.json`](job-ingest.workflow.json) | `tracked` Gmail label |
+
+After importing, open the workflow and:
+
+- Re-select your credential (the **IMAP** credential on the *Email Trigger (IMAP)* node, or the
+  **Gmail** credential on the *Gmail Trigger* / *Mark tracked* nodes — credential IDs don't
+  survive import).
 - Confirm the model name in the *Extract (Ollama)* node matches what you pulled.
 - Activate the workflow (toggle top-right).
 
-If anything imports oddly for your n8n version, build it by hand from the node reference below —
-it's only six nodes.
+If anything imports oddly for your n8n version, build it by hand from the node reference below.
+
+### IMAP variant — what differs
+
+The IMAP flow is `Email Trigger (IMAP) → Build prompt → Extract (Ollama) → Parse → IF → Create job`
+(no *Mark tracked* node). Configure the trigger:
+
+- **Mailbox:** `INBOX` — or point it at a Gmail-filter label-folder (e.g. `Applications`) to
+  pre-filter server-side and avoid marking inbox mail as read. (IMAP search can't do Gmail's
+  rich `from:`/`subject:` query, so filtering moves to a Gmail filter or the LLM itself.)
+- **Action:** mark messages as **read** after fetching (this is the dedup).
+- **Custom email rules:** `["UNSEEN"]` so only unread mail is pulled.
+- **Format:** `Resolved`. The *Build prompt* node already maps the IMAP fields
+  (`subject`, `from.text`, `text`); verify against the trigger's output panel.
 
 ## Workflow node reference
 
