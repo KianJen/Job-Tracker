@@ -33,21 +33,24 @@ HOST_IP=192.168.1.113 TZ=America/Toronto docker compose -f automation/docker-com
 
 ## 2. Pull the extraction model
 
-**`qwen2.5:7b-instruct`** (~5 GB) is a good default — strong at structured extraction and
-still runs acceptably on CPU:
+**`llama3.2:3b`** (~2 GB) is the default — fast on CPU, which matters because n8n's HTTP
+Request node aborts the run if a single extraction takes too long. A tight prompt does most
+of the work, so a small fast model is a sensible default:
 
 ```bash
-docker exec -it automation-ollama-1 ollama pull qwen2.5:7b-instruct
+docker exec -it automation-ollama-1 ollama pull llama3.2:3b
 ```
 
-Lighter option if you're RAM-constrained: `llama3.2:3b` (~2 GB, faster but weaker at
-extraction). Heavier option if 7b still misses: `qwen2.5:14b-instruct` (~9 GB, slower on CPU,
-wants 24 GB+ RAM). First inference after startup is slow (model load); subsequent ones are quick.
+More accurate but slower: `qwen2.5:7b-instruct` (~5 GB) or `qwen2.5:14b-instruct` (~9 GB). They
+extract better, but on a CPU box a single call can exceed n8n's request timeout and abort the
+run. If you use one, raise the HTTP Request node's **Options → Timeout**, and set Ollama
+`keep_alive` so the model stays warm between polls. First inference after startup is always slow
+(model load); subsequent ones are quicker.
 
 Sanity check the model:
 
 ```bash
-docker exec -it automation-ollama-1 ollama run qwen2.5:7b-instruct "Reply with the word OK"
+docker exec -it automation-ollama-1 ollama run llama3.2:3b "Reply with the word OK"
 ```
 
 ## 3. Open n8n and connect Gmail
@@ -115,7 +118,7 @@ The IMAP flow is `Email Trigger (IMAP) → Build prompt → Extract (Ollama) →
 - **Body → JSON** (Ollama forces valid JSON via the `format` schema; `temperature: 0` keeps it deterministic):
   ```json
   {
-    "model": "qwen2.5:7b-instruct",
+    "model": "llama3.2:3b",
     "stream": false,
     "options": { "temperature": 0 },
     "format": {
@@ -130,7 +133,7 @@ The IMAP flow is `Email Trigger (IMAP) → Build prompt → Extract (Ollama) →
     "messages": [
       {
         "role": "system",
-        "content": "You extract data from job-application emails. Decide if the email confirms that the user SUBMITTED an application (e.g. 'we received your application', 'thanks for applying'). It is NOT a confirmation if it is an interview invite, rejection, job alert, newsletter, or marketing. Extract the hiring company name and the job title. If a field is unknown or it is not a confirmation, use an empty string. Output only JSON."
+        "content": "You classify job-application emails and output JSON only. Set is_application_confirmation=true ONLY when the email confirms the user has ALREADY SUBMITTED an application to a specific hiring company for a specific role. Set false for everything else, including reminders to COMPLETE, FINISH, or SUBMIT an application ('almost there', 'complete your application') which mean it was NOT submitted; interview invites; rejections; job alerts; newsletters; marketing. The company must be the actual HIRING company - job boards/ATS platforms (Indeed, LinkedIn, Greenhouse, Lever, Workday, Ashby) are NOT the company; if only a platform is named, set false and leave company empty. Extract 'company' and 'role'; if not a confirmation or unknown, use an empty string."
       },
       {
         "role": "user",
@@ -192,8 +195,14 @@ Two layers, both cheap:
 
 ## Tuning & troubleshooting
 
-- **Wrong/empty extraction:** try a bigger model (`qwen2.5:14b-instruct`), or add 1–2 example
-  emails to the system prompt (few-shot). Keep `temperature: 0`.
+- **False positives / wrong company** (e.g. a job created from a "complete your application"
+  reminder, or a job board like Indeed used as the company): tighten the system prompt with an
+  explicit exclusion for that case — that's cheaper and more reliable than a bigger model. A
+  larger model (`qwen2.5:7b`/`14b-instruct`) also helps but is slower and can hit the request
+  timeout. Keep `temperature: 0`.
+- **Run aborts / times out:** the model is too slow per email for n8n's HTTP timeout. Use a
+  smaller model (`llama3.2:3b`), raise the HTTP Request node's timeout, and/or set Ollama
+  `keep_alive` to avoid reloading the model each poll.
 - **n8n can't reach Ollama/API:** confirm all three containers are on `backend_default`
   (`docker network inspect backend_default`). n8n uses the service names `ollama` / `api`.
 - **Slow first run:** model load on first request; subsequent calls are fast. CPU latency is
