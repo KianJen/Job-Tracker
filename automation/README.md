@@ -133,7 +133,7 @@ The IMAP flow is `Email Trigger (IMAP) → Build prompt → Extract (Ollama) →
     "messages": [
       {
         "role": "system",
-        "content": "You classify job-application emails and output JSON only. Set is_application_confirmation=true ONLY when the email confirms the user has ALREADY SUBMITTED an application to a specific hiring company for a specific role. Set false for everything else, including reminders to COMPLETE, FINISH, or SUBMIT an application ('almost there', 'complete your application') which mean it was NOT submitted; interview invites; rejections; job alerts; newsletters; marketing. The company must be the actual HIRING company - job boards/ATS platforms (Indeed, LinkedIn, Greenhouse, Lever, Workday, Ashby) are NOT the company; if only a platform is named, set false and leave company empty. Extract 'company' and 'role'; if not a confirmation or unknown, use an empty string."
+        "content": "You classify job-application emails and output JSON only. Set is_application_confirmation=true ONLY when the email confirms the user has ALREADY SUBMITTED an application to a specific hiring company for a specific role. Set false for everything else, including reminders to COMPLETE, FINISH, or SUBMIT an application ('almost there', 'complete your application') which mean it was NOT submitted; interview invites; rejections; job alerts; newsletters; marketing. The company must be the actual HIRING company - job boards/ATS platforms (Indeed, LinkedIn, Greenhouse, Lever, Workday, Ashby) are NOT the company; if only a platform is named, set false and leave company empty. The job title often follows 'your application for'/'the position of' and may be wrapped in a requisition ID and an (Open) status - extract just the readable title (e.g. 'R0954602 IT Operations Analyst (OhioRISE) (Open)' -> 'IT Operations Analyst (OhioRISE)'). Extract 'company' and 'role'; if not a confirmation or unknown, use an empty string."
       },
       {
         "role": "user",
@@ -200,6 +200,9 @@ Two layers, both cheap:
   explicit exclusion for that case — that's cheaper and more reliable than a bigger model. A
   larger model (`qwen2.5:7b`/`14b-instruct`) also helps but is slower and can hit the request
   timeout. Keep `temperature: 0`.
+- **Role left blank on a real confirmation:** the job title is often wrapped in a requisition
+  ID and a status (e.g. `R0954602 IT Operations Analyst (OhioRISE) (Open)`). The prompt includes
+  a worked example of stripping those; if a new wrapper format still fails, add it as another example.
 - **Run aborts / times out:** the model is too slow per email for n8n's HTTP timeout. Use a
   smaller model (`llama3.2:3b`), raise the HTTP Request node's timeout, and/or set Ollama
   `keep_alive` to avoid reloading the model each poll.
