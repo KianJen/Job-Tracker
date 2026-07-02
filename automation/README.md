@@ -33,20 +33,21 @@ HOST_IP=192.168.1.113 TZ=America/Toronto docker compose -f automation/docker-com
 
 ## 2. Pull the extraction model
 
-A small instruct model is plenty for "is this a confirmation + what's the company/role."
-On a CPU-only mini PC, **`llama3.2:3b`** is a good default (~2 GB, fast):
+**`qwen2.5:7b-instruct`** (~5 GB) is a good default — strong at structured extraction and
+still runs acceptably on CPU:
 
 ```bash
-docker exec -it automation-ollama-1 ollama pull llama3.2:3b
+docker exec -it automation-ollama-1 ollama pull qwen2.5:7b-instruct
 ```
 
-If you have more RAM and want better extraction accuracy, `qwen2.5:7b-instruct` (~5 GB) is
-a strong upgrade. First inference after startup is slow (model load); subsequent ones are quick.
+Lighter option if you're RAM-constrained: `llama3.2:3b` (~2 GB, faster but weaker at
+extraction). Heavier option if 7b still misses: `qwen2.5:14b-instruct` (~9 GB, slower on CPU,
+wants 24 GB+ RAM). First inference after startup is slow (model load); subsequent ones are quick.
 
 Sanity check the model:
 
 ```bash
-docker exec -it automation-ollama-1 ollama run llama3.2:3b "Reply with the word OK"
+docker exec -it automation-ollama-1 ollama run qwen2.5:7b-instruct "Reply with the word OK"
 ```
 
 ## 3. Open n8n and connect Gmail
@@ -114,7 +115,7 @@ The IMAP flow is `Email Trigger (IMAP) → Build prompt → Extract (Ollama) →
 - **Body → JSON** (Ollama forces valid JSON via the `format` schema; `temperature: 0` keeps it deterministic):
   ```json
   {
-    "model": "llama3.2:3b",
+    "model": "qwen2.5:7b-instruct",
     "stream": false,
     "options": { "temperature": 0 },
     "format": {
@@ -191,8 +192,8 @@ Two layers, both cheap:
 
 ## Tuning & troubleshooting
 
-- **Wrong/empty extraction:** try `qwen2.5:7b-instruct`, or add 1–2 example emails to the
-  system prompt (few-shot). Keep `temperature: 0`.
+- **Wrong/empty extraction:** try a bigger model (`qwen2.5:14b-instruct`), or add 1–2 example
+  emails to the system prompt (few-shot). Keep `temperature: 0`.
 - **n8n can't reach Ollama/API:** confirm all three containers are on `backend_default`
   (`docker network inspect backend_default`). n8n uses the service names `ollama` / `api`.
 - **Slow first run:** model load on first request; subsequent calls are fast. CPU latency is
