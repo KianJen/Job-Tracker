@@ -138,7 +138,7 @@ The IMAP flow is `Email Trigger (IMAP) → Build prompt → Extract (Ollama) →
     "messages": [
       {
         "role": "system",
-        "content": "You classify job-application emails and output JSON only. Set is_application_confirmation=true ONLY when the email confirms the user has ALREADY SUBMITTED an application to a specific hiring company for a specific role. Set false for everything else, including reminders to COMPLETE, FINISH, or SUBMIT an application ('almost there', 'complete your application') which mean it was NOT submitted; interview invites; rejections; job alerts; newsletters; marketing. The company must be the actual HIRING company - job boards/ATS platforms (Indeed, LinkedIn, Greenhouse, Lever, Workday, Ashby) are NOT the company; if only a platform is named, set false and leave company empty. The job title often follows 'your application for'/'the position of' and may be wrapped in a requisition ID and an (Open) status - extract just the readable title (e.g. 'R0954602 IT Operations Analyst (OhioRISE) (Open)' -> 'IT Operations Analyst (OhioRISE)'). Extract 'company' and 'role'; if not a confirmation or unknown, use an empty string."
+        "content": "You classify job-application emails and output JSON only. Set is_application_confirmation=true ONLY when the email confirms the user has ALREADY SUBMITTED an application to a specific hiring company for a specific role. Set false for everything else, including reminders to COMPLETE, FINISH, or SUBMIT an application ('almost there', 'complete your application') which mean it was NOT submitted; interview invites; rejections; job alerts; newsletters; marketing. Company is the HIRING employer, not the job board/ATS platform (Indeed, LinkedIn, Greenhouse, Lever, Workday, Ashby) that may send it on the employer's behalf - e.g. an Indeed 'Application submitted ... sent to Gifthealth Inc' has company 'Gifthealth Inc'. Only set false if no employer is named at all. The job title often follows 'your application for'/'the position of' and may be wrapped in a requisition ID and an (Open) status - extract just the readable title (e.g. 'R0954602 IT Operations Analyst (OhioRISE) (Open)' -> 'IT Operations Analyst (OhioRISE)'). Extract 'company' and 'role'; if not a confirmation or unknown, use an empty string."
       },
       {
         "role": "user",
@@ -208,6 +208,11 @@ Two layers, both cheap:
 - **Role left blank on a real confirmation:** the job title is often wrapped in a requisition
   ID and a status (e.g. `R0954602 IT Operations Analyst (OhioRISE) (Open)`). The prompt includes
   a worked example of stripping those; if a new wrapper format still fails, add it as another example.
+- **Real confirmations skipped** (e.g. Indeed/LinkedIn "Application submitted" emails): the
+  *sender* is the platform but the real employer is named in the body — the prompt extracts that
+  employer, not the platform. If these are still missed, the workflow likely wasn't re-imported.
+- **Changes not taking effect:** n8n runs its own stored copy of the workflow. After any prompt
+  or model edit you must **re-import** (or hand-edit the node) in n8n — a `git pull` alone does nothing.
 - **Run aborts / times out:** the model is too slow per email for n8n's HTTP timeout. Use a
   smaller model (`llama3.2:3b`), raise the HTTP Request node's timeout, and/or set Ollama
   `keep_alive` to avoid reloading the model each poll.
