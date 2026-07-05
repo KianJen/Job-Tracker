@@ -14,6 +14,10 @@ name: automation
 services:
   ollama:
     image: ollama/ollama:latest
+    environment:
+      # Keep the model resident for 30m so a warm request avoids the multi-second
+      # reload that otherwise happens between 15-min polls (default unload is 5m).
+      - OLLAMA_KEEP_ALIVE=30m
     volumes:
       - ollama_models:/root/.ollama
     networks:

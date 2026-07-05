@@ -33,24 +33,28 @@ HOST_IP=192.168.1.113 TZ=America/Toronto docker compose -f automation/docker-com
 
 ## 2. Pull the extraction model
 
-**`llama3.2:3b`** (~2 GB) is the default — fast on CPU, which matters because n8n's HTTP
-Request node aborts the run if a single extraction takes too long. A tight prompt does most
-of the work, so a small fast model is a sensible default:
+**`qwen2.5:7b-instruct`** (~5 GB) is the default — it extracts noticeably better than a small
+model. It's slower on CPU, so two mitigations are already wired into this stack to stop n8n
+aborting on timeout:
+
+- **`OLLAMA_KEEP_ALIVE=30m`** is set on the `ollama` service (compose), so the model stays
+  resident between 15-min polls instead of reloading ~5 GB each time (the usual timeout cause).
+- The **Extract (Ollama)** HTTP node's timeout is raised to 5 minutes, covering the slow cold
+  call right after startup.
 
 ```bash
-docker exec -it automation-ollama-1 ollama pull llama3.2:3b
+docker exec -it automation-ollama-1 ollama pull qwen2.5:7b-instruct
 ```
 
-More accurate but slower: `qwen2.5:7b-instruct` (~5 GB) or `qwen2.5:14b-instruct` (~9 GB). They
-extract better, but on a CPU box a single call can exceed n8n's request timeout and abort the
-run. If you use one, raise the HTTP Request node's **Options → Timeout**, and set Ollama
-`keep_alive` so the model stays warm between polls. First inference after startup is always slow
-(model load); subsequent ones are quicker.
+Faster / lighter fallback if it's still too slow on your box: `llama3.2:3b` (~2 GB) — just
+change `model` in the *Build prompt* node. Heavier / most accurate: `qwen2.5:14b-instruct`
+(~9 GB, wants 24 GB+ RAM). The first inference after startup is always slow (model load); with
+`keep_alive` set, the rest stay quick.
 
-Sanity check the model:
+Sanity check (this also warms the model):
 
 ```bash
-docker exec -it automation-ollama-1 ollama run llama3.2:3b "Reply with the word OK"
+docker exec -it automation-ollama-1 ollama run qwen2.5:7b-instruct "Reply with the word OK"
 ```
 
 ## 3. Open n8n and connect Gmail
@@ -115,10 +119,11 @@ The IMAP flow is `Email Trigger (IMAP) → Build prompt → Extract (Ollama) →
 
 ### 2) Extract (Ollama) — HTTP Request
 - **Method:** POST  **URL:** `http://ollama:11434/api/chat`
+- **Options → Timeout:** `300000` (5 min) — a cold 7B call on CPU can be slow; don't let n8n abort it.
 - **Body → JSON** (Ollama forces valid JSON via the `format` schema; `temperature: 0` keeps it deterministic):
   ```json
   {
-    "model": "llama3.2:3b",
+    "model": "qwen2.5:7b-instruct",
     "stream": false,
     "options": { "temperature": 0 },
     "format": {
