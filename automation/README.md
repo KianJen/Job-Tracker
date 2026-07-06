@@ -5,7 +5,7 @@ and role with a **local LLM (Ollama)** — no API fees — and creates a job in 
 with status **Applied**.
 
 ```
-Gmail Trigger ─▶ Extract (Ollama) ─▶ Parse ─▶ IF confirmation ─▶ POST /api/jobs ─▶ label "tracked"
+Gmail Trigger ─▶ Extract (Ollama) ─▶ Parse ─▶ IF confirmation ─▶ Dedup ─▶ POST /api/jobs ─▶ label "tracked"
 ```
 
 Everything runs on your LXC. n8n talks to the tracker at `http://api:8000` and to the
@@ -96,7 +96,7 @@ If anything imports oddly for your n8n version, build it by hand from the node r
 
 ### IMAP variant — what differs
 
-The IMAP flow is `Email Trigger (IMAP) → Build prompt → Extract (Ollama) → Parse → IF → Create job`
+The IMAP flow is `Email Trigger (IMAP) → Build prompt → Extract (Ollama) → Parse → IF → Dedup → Create job`
 (no *Mark tracked* node). Configure the trigger:
 
 - **Mailbox:** `INBOX` — or point it at a Gmail-filter label-folder (e.g. `Applications`) to
@@ -193,10 +193,15 @@ Two layers, both cheap:
 
 - **Per-email:** the `tracked` label + `-label:tracked` in the search query means an email is
   never reprocessed.
-- **Per-application (optional):** to avoid duplicate jobs from multiple confirmation emails,
-  add an HTTP Request `GET http://api:8000/api/jobs` before *Create job* and a Code/IF node
-  that skips creation if a job with the same company+role already exists. The API has no
-  upsert yet, so this guard lives in n8n. Add it once the basic flow works.
+- **Per-application:** the **Dedup** Code node (between *IF* and *Create job*) drops emails whose
+  company+role already exists. It normalizes company+role (lowercases, strips punctuation and
+  `Inc`/`LLC`/`Ltd`/`Corp`/`Co` suffixes) and skips an item if that key was already seen — both
+  **within the same batch** (the common case: a job board and the employer each send a
+  confirmation seconds apart, landing in one poll) and **against existing jobs** fetched from
+  `GET /api/jobs` (best-effort; if the API is unreachable it still dedups within the batch).
+  - Limitation: matching is heuristic. If the two senders name the company differently enough
+    that normalization can't reconcile them (e.g. `Gifthealth` vs `Gift Health`), both slip
+    through. Widen the normalization or move dedup into the API if that becomes common.
 
 ## Tuning & troubleshooting
 

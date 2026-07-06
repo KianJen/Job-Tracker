@@ -126,11 +126,24 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1100,
+        1320,
         -100
       ],
       "id": "b2c3d4e5-0006-4000-8000-000000000006",
       "name": "Create job"
+    },
+    {
+      "parameters": {
+        "jsCode": "const norm = (s) => (s || '').toString().toLowerCase().replace(/\\b(inc|llc|ltd|corp|co)\\b\\.?/g, ' ').replace(/[^a-z0-9]+/g, ' ').trim();\nconst key = (o) => norm(o.company) + '|' + norm(o.role);\nlet existing = [];\ntry {\n  existing = await this.helpers.httpRequest({ url: 'http://api:8000/api/jobs', json: true });\n} catch (e) {\n  existing = []; // API unreachable -> fall back to within-batch dedup only\n}\nconst seen = new Set((Array.isArray(existing) ? existing : []).map(key));\nconst out = [];\nfor (const item of $input.all()) {\n  const k = key(item.json);\n  if (seen.has(k)) continue;\n  seen.add(k);\n  out.push({ json: item.json, pairedItem: item.pairedItem });\n}\nreturn out;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        -100
+      ],
+      "id": "b2c3d4e5-0007-4000-8000-000000000007",
+      "name": "Dedup"
     }
   ],
   "connections": {
@@ -182,12 +195,23 @@
       "main": [
         [
           {
-            "node": "Create job",
+            "node": "Dedup",
             "type": "main",
             "index": 0
           }
         ],
         []
+      ]
+    },
+    "Dedup": {
+      "main": [
+        [
+          {
+            "node": "Create job",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   },
