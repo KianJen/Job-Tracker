@@ -12,20 +12,29 @@
       },
       "type": "n8n-nodes-base.emailReadImap",
       "typeVersion": 2,
-      "position": [0, 0],
+      "position": [
+        0,
+        0
+      ],
       "id": "b2c3d4e5-0001-4000-8000-000000000001",
       "name": "Email Trigger (IMAP)",
       "credentials": {
-        "imap": { "id": "REPLACE_WITH_YOUR_IMAP_CREDENTIAL", "name": "Gmail IMAP" }
+        "imap": {
+          "id": "REPLACE_WITH_YOUR_IMAP_CREDENTIAL",
+          "name": "Gmail IMAP"
+        }
       }
     },
     {
       "parameters": {
-        "jsCode": "return $input.all().map((item, i) => {\n  const subject = item.json.subject || '';\n  const from = (item.json.from && item.json.from.text) || item.json.from || '';\n  const text = (item.json.text || item.json.textAsHtml || '').slice(0, 6000);\n  const system = \"You classify job-application emails and output JSON only. Set is_application_confirmation=true when the email confirms the user has ALREADY SUBMITTED an application for a specific role (e.g. 'we received your application', 'thanks for applying', 'Application submitted', 'the following items were sent to <employer>'). Set is_application_confirmation=false for: reminders to COMPLETE, FINISH, CONTINUE, or SUBMIT an application ('almost there', 'complete your application', 'finish applying') which mean it was NOT submitted; interview invites; rejections; job alerts or recommendations; newsletters; marketing. Company is the actual HIRING employer, NOT the job board or ATS platform (Indeed, LinkedIn, Glassdoor, Greenhouse, Lever, Workday, Ashby); these platforms often send the confirmation on the employer's behalf, so extract the employer named in the body. For example, an Indeed email saying 'Application submitted' and 'the following items were sent to Gifthealth Inc' has company 'Gifthealth Inc', not Indeed. Only set false and leave company empty if NO real employer is named anywhere. Role is the job title; it usually follows 'your application for', 'the position of', or 'the role of', or appears near the top of the email, and may be preceded by a requisition/job ID (e.g. R0954602) and followed by a status like (Open) - extract only the readable title and drop the ID and status. Examples: from 'received your application for: R0954602 IT Operations Analyst (OhioRISE) (Open)' the role is 'IT Operations Analyst (OhioRISE)'; an Indeed email for 'IT Support Specialist I' at Gifthealth Inc has role 'IT Support Specialist I'. If it is not a confirmation or a field is truly unknown, use an empty string for that field.\";\n  return {\n    json: {\n      ollamaBody: {\n        model: 'qwen2.5:7b-instruct',\n        stream: false,\n        options: { temperature: 0 },\n        format: {\n          type: 'object',\n          properties: {\n            is_application_confirmation: { type: 'boolean' },\n            company: { type: 'string' },\n            role: { type: 'string' }\n          },\n          required: ['is_application_confirmation', 'company', 'role']\n        },\n        messages: [\n          { role: 'system', content: system },\n          { role: 'user', content: `Subject: ${subject}\\n\\nFrom: ${from}\\n\\nBody:\\n${text}` }\n        ]\n      }\n    },\n    pairedItem: { item: i }\n  };\n});"
+        "jsCode": "const htmlToText = (h) => (h || '').replace(/<!--[\\s\\S]*?-->/g, ' ').replace(/<(style|script)[\\s\\S]*?<\\/\\1>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&').replace(/&lt;/gi, '<').replace(/&gt;/gi, '>').replace(/&#\\d+;/g, ' ').replace(/\\s+/g, ' ').trim();\nreturn $input.all().map((item, i) => {\n  const subject = item.json.subject || '';\n  const from = (item.json.from && item.json.from.text) || item.json.from || '';\n  const text = (item.json.text || htmlToText(item.json.html || item.json.textHtml || item.json.textAsHtml || '') || item.json.snippet || '').slice(0, 6000);\n  const system = \"You classify job-application emails and output JSON only. Set is_application_confirmation=true when the email confirms the user has ALREADY SUBMITTED an application for a specific role (e.g. 'we received your application', 'thanks for applying', 'Application submitted', 'the following items were sent to <employer>'). Set is_application_confirmation=false for: reminders to COMPLETE, FINISH, CONTINUE, or SUBMIT an application ('almost there', 'complete your application', 'finish applying') which mean it was NOT submitted; interview invites; rejections; job alerts or recommendations; newsletters; marketing. Company is the actual HIRING employer, NOT the job board or ATS platform (Indeed, LinkedIn, Glassdoor, Greenhouse, Lever, Workday, Ashby); these platforms often send the confirmation on the employer's behalf, so extract the employer named in the body. For example, an Indeed email saying 'Application submitted' and 'the following items were sent to Gifthealth Inc' has company 'Gifthealth Inc', not Indeed. Only set false and leave company empty if NO real employer is named anywhere. Role is the job title; it usually follows 'your application for', 'the position of', or 'the role of', or appears near the top of the email, and may be preceded by a requisition/job ID (e.g. R0954602) and followed by a status like (Open) - extract only the readable title and drop the ID and status. Examples: from 'received your application for: R0954602 IT Operations Analyst (OhioRISE) (Open)' the role is 'IT Operations Analyst (OhioRISE)'; an Indeed email for 'IT Support Specialist I' at Gifthealth Inc has role 'IT Support Specialist I'. If it is not a confirmation or a field is truly unknown, use an empty string for that field.\";\n  return {\n    json: {\n      ollamaBody: {\n        model: 'qwen2.5:7b-instruct',\n        stream: false,\n        options: { temperature: 0 },\n        format: {\n          type: 'object',\n          properties: {\n            is_application_confirmation: { type: 'boolean' },\n            company: { type: 'string' },\n            role: { type: 'string' }\n          },\n          required: ['is_application_confirmation', 'company', 'role']\n        },\n        messages: [\n          { role: 'system', content: system },\n          { role: 'user', content: `Subject: ${subject}\\n\\nFrom: ${from}\\n\\nBody:\\n${text}` }\n        ]\n      }\n    },\n    pairedItem: { item: i }\n  };\n});"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [220, 0],
+      "position": [
+        220,
+        0
+      ],
       "id": "b2c3d4e5-0002-4000-8000-000000000002",
       "name": "Build prompt"
     },
@@ -36,11 +45,16 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ $json.ollamaBody }}",
-        "options": { "timeout": 300000 }
+        "options": {
+          "timeout": 300000
+        }
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [440, 0],
+      "position": [
+        440,
+        0
+      ],
       "id": "b2c3d4e5-0003-4000-8000-000000000003",
       "name": "Extract (Ollama)"
     },
@@ -50,26 +64,41 @@
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [660, 0],
+      "position": [
+        660,
+        0
+      ],
       "id": "b2c3d4e5-0004-4000-8000-000000000004",
       "name": "Parse"
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
           "conditions": [
             {
               "id": "cond-1",
               "leftValue": "={{ $json.is_application_confirmation }}",
               "rightValue": "",
-              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
             },
             {
               "id": "cond-2",
               "leftValue": "={{ $json.company }}",
               "rightValue": "",
-              "operator": { "type": "string", "operation": "notEmpty", "singleValue": true }
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
             }
           ],
           "combinator": "and"
@@ -78,7 +107,10 @@
       },
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [880, 0],
+      "position": [
+        880,
+        0
+      ],
       "id": "b2c3d4e5-0005-4000-8000-000000000005",
       "name": "Is confirmation?"
     },
@@ -93,20 +125,76 @@
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1100, -100],
+      "position": [
+        1100,
+        -100
+      ],
       "id": "b2c3d4e5-0006-4000-8000-000000000006",
       "name": "Create job"
     }
   ],
   "connections": {
-    "Email Trigger (IMAP)": { "main": [ [ { "node": "Build prompt", "type": "main", "index": 0 } ] ] },
-    "Build prompt": { "main": [ [ { "node": "Extract (Ollama)", "type": "main", "index": 0 } ] ] },
-    "Extract (Ollama)": { "main": [ [ { "node": "Parse", "type": "main", "index": 0 } ] ] },
-    "Parse": { "main": [ [ { "node": "Is confirmation?", "type": "main", "index": 0 } ] ] },
-    "Is confirmation?": { "main": [ [ { "node": "Create job", "type": "main", "index": 0 } ], [] ] }
+    "Email Trigger (IMAP)": {
+      "main": [
+        [
+          {
+            "node": "Build prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build prompt": {
+      "main": [
+        [
+          {
+            "node": "Extract (Ollama)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract (Ollama)": {
+      "main": [
+        [
+          {
+            "node": "Parse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse": {
+      "main": [
+        [
+          {
+            "node": "Is confirmation?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is confirmation?": {
+      "main": [
+        [
+          {
+            "node": "Create job",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
   },
   "active": false,
-  "settings": { "executionOrder": "v1" },
+  "settings": {
+    "executionOrder": "v1"
+  },
   "pinData": {},
   "meta": {}
 }
