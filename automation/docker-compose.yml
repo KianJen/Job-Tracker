@@ -18,6 +18,10 @@ services:
       # Keep the model resident for 30m so a warm request avoids the multi-second
       # reload that otherwise happens between 15-min polls (default unload is 5m).
       - OLLAMA_KEEP_ALIVE=30m
+      # Serialize inference: on a CPU box parallel requests only contend for cores
+      # (no throughput gain) and cost extra KV-cache RAM. Belt-and-suspenders with
+      # the n8n concurrency cap. Raise this if you ever move to a GPU.
+      - OLLAMA_NUM_PARALLEL=1
     volumes:
       - ollama_models:/root/.ollama
     networks:
