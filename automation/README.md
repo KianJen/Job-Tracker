@@ -208,10 +208,11 @@ Two layers, both cheap:
 - **Role left blank on a real confirmation:** the job title is often wrapped in a requisition
   ID and a status (e.g. `R0954602 IT Operations Analyst (OhioRISE) (Open)`). The prompt includes
   a worked example of stripping those; if a new wrapper format still fails, add it as another example.
-- **Company/role blank because the model got an empty body:** many confirmation emails
-  (CVS/Workday, etc.) are HTML-only, so the IMAP node populates `html` but not `text`/`textAsHtml`.
-  The *Build prompt* node strips `html` to plain text as a fallback (`htmlToText`) so the body still
-  reaches the model — if you rebuild the node by hand, keep that fallback.
+- **Company/role blank because the model got an empty body:** confirmation emails are often
+  HTML-only (CVS/Workday) or ship a *sparse* text/plain stub that omits the employer/role while the
+  full content sits in the HTML (Indeed). The *Build prompt* node therefore **combines** the plain
+  text with the stripped HTML (`htmlToText`) so the body always reaches the model — if you rebuild
+  the node by hand, keep that combine step.
 - **Real confirmations skipped** (e.g. Indeed/LinkedIn "Application submitted" emails): the
   *sender* is the platform but the real employer is named in the body — the prompt extracts that
   employer, not the platform. If these are still missed, the workflow likely wasn't re-imported.
