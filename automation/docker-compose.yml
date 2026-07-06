@@ -44,6 +44,10 @@ services:
       - WEBHOOK_URL=http://${HOST_IP:-localhost}:5678/
       # Allow login over plain HTTP on the LAN (no TLS in front of n8n here):
       - N8N_SECURE_COOKIE=false
+      # Run at most one production execution at a time, so overlapping polls never
+      # send two concurrent requests to the (CPU-bound) Ollama model. Extra executions
+      # queue instead of running in parallel.
+      - N8N_CONCURRENCY_PRODUCTION_LIMIT=1
       - GENERIC_TIMEZONE=${TZ:-UTC}
       - TZ=${TZ:-UTC}
     ports:
