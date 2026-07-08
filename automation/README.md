@@ -223,6 +223,12 @@ Two layers, both cheap:
   padding characters, which balloon the token count and choke CPU inference. The *Build prompt*
   node strips URLs and zero-width/invisible characters (`clean`) before the 6000-char cap — e.g. a
   LinkedIn confirmation drops from ~6000 to ~2000 chars while keeping the employer and role.
+- **Real confirmation flagged as "not a confirmation" (LinkedIn especially):** these emails bury
+  the actual confirmation under a "View similar jobs" recommendation block and notification
+  boilerplate, so the model reads the whole thing as a job alert. The *Build prompt* node truncates
+  the body at those markers (`cut`: `view similar jobs` / `take these next steps` / `jobs you may be
+  interested in`) so only the confirmation reaches the model. Add a marker there if a new provider
+  uses different wording.
 - **Real confirmations skipped** (e.g. Indeed/LinkedIn "Application submitted" emails): the
   *sender* is the platform but the real employer is named in the body — the prompt extracts that
   employer, not the platform. If these are still missed, the workflow likely wasn't re-imported.
