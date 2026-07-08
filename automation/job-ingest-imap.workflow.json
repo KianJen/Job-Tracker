@@ -52,8 +52,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        440,
-        0
+        480,
+        200
       ],
       "id": "b2c3d4e5-0003-4000-8000-000000000003",
       "name": "Extract (Ollama)"
@@ -144,6 +144,20 @@
       ],
       "id": "b2c3d4e5-0007-4000-8000-000000000007",
       "name": "Dedup"
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        440,
+        0
+      ],
+      "id": "b2c3d4e5-0008-4000-8000-000000000008",
+      "name": "Loop Over Items"
     }
   ],
   "connections": {
@@ -162,7 +176,7 @@
       "main": [
         [
           {
-            "node": "Extract (Ollama)",
+            "node": "Loop Over Items",
             "type": "main",
             "index": 0
           }
@@ -173,7 +187,7 @@
       "main": [
         [
           {
-            "node": "Parse",
+            "node": "Loop Over Items",
             "type": "main",
             "index": 0
           }
@@ -208,6 +222,24 @@
         [
           {
             "node": "Create job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Parse",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract (Ollama)",
             "type": "main",
             "index": 0
           }
