@@ -218,6 +218,11 @@ Two layers, both cheap:
   full content sits in the HTML (Indeed). The *Build prompt* node therefore **combines** the plain
   text with the stripped HTML (`htmlToText`) so the body always reaches the model — if you rebuild
   the node by hand, keep that combine step.
+- **Model stalls / times out on one specific email (not a cold start):** newsletter-style
+  confirmations (LinkedIn especially) pack the body with long tracking URLs and invisible
+  padding characters, which balloon the token count and choke CPU inference. The *Build prompt*
+  node strips URLs and zero-width/invisible characters (`clean`) before the 6000-char cap — e.g. a
+  LinkedIn confirmation drops from ~6000 to ~2000 chars while keeping the employer and role.
 - **Real confirmations skipped** (e.g. Indeed/LinkedIn "Application submitted" emails): the
   *sender* is the platform but the real employer is named in the body — the prompt extracts that
   employer, not the platform. If these are still missed, the workflow likely wasn't re-imported.
