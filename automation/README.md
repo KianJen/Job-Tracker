@@ -31,31 +31,36 @@ right values (defaults are `localhost` / `UTC`):
 HOST_IP=192.168.1.113 TZ=America/Toronto docker compose -f automation/docker-compose.yml up -d
 ```
 
-## 2. Pull the extraction model
+## 2. Model: OpenRouter (free)
 
-**`qwen2.5:7b-instruct`** (~5 GB) is the default — it extracts noticeably better than a small
-model. It's slower on CPU, so two mitigations are already wired into this stack to stop n8n
-aborting on timeout:
+The workflows call a **free model on OpenRouter** (OpenAI-compatible API), so no local GPU/CPU
+inference and no fan noise. The *Extract (OpenRouter)* node POSTs to
+`https://openrouter.ai/api/v1/chat/completions`.
 
-- **`OLLAMA_KEEP_ALIVE=30m`** is set on the `ollama` service (compose), so the model stays
-  resident between 15-min polls instead of reloading ~5 GB each time (the usual timeout cause).
-- The **Extract (Ollama)** HTTP node's timeout is raised to 5 minutes, covering the slow cold
-  call right after startup.
+Set it up:
+
+1. Create an account at <https://openrouter.ai> and generate an API key (**Keys** page).
+2. Pick a **free** model at <https://openrouter.ai/models?max_price=0> — the *Build prompt* node
+   defaults to `meta-llama/llama-3.3-70b-instruct:free`; change the `model` field if that one is
+   unavailable or rate-limited. Free models have request caps, but a few emails per 15-min poll
+   stays well within them.
+3. In n8n, create a **Header Auth** credential named `OpenRouter`:
+   - **Name:** `Authorization`
+   - **Value:** `Bearer <your OpenRouter API key>`
+   Then select it on the *Extract (OpenRouter)* node (the import leaves it unset).
+
+> **Privacy:** unlike the old local setup, email content now leaves your network. Free-tier
+> providers may log/train on prompts — review OpenRouter's privacy settings (or use a no-logging
+> paid model) if that matters for your job-search data.
+
+**Ollama is no longer used.** Silence the mini PC by stopping it, and reclaim disk if you like:
 
 ```bash
-docker exec -it automation-ollama-1 ollama pull qwen2.5:7b-instruct
+docker compose -f automation/docker-compose.yml stop ollama
+docker exec automation-ollama-1 ollama rm qwen2.5:7b-instruct   # optional, before stopping
 ```
-
-Faster / lighter fallback if it's still too slow on your box: `llama3.2:3b` (~2 GB) — just
-change `model` in the *Build prompt* node. Heavier / most accurate: `qwen2.5:14b-instruct`
-(~9 GB, wants 24 GB+ RAM). The first inference after startup is always slow (model load); with
-`keep_alive` set, the rest stay quick.
-
-Sanity check (this also warms the model):
-
-```bash
-docker exec -it automation-ollama-1 ollama run qwen2.5:7b-instruct "Reply with the word OK"
-```
+(The `ollama` service and its `OLLAMA_*` env vars in the compose file are now dead weight — safe
+to remove entirely; left in place for now in case you want to switch back to local.)
 
 ## 3. Open n8n and connect Gmail
 
