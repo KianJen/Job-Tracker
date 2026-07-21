@@ -41,7 +41,7 @@ Set it up:
 
 1. Create an account at <https://openrouter.ai> and generate an API key (**Keys** page).
 2. Pick a **free** model at <https://openrouter.ai/models?max_price=0> — the *Build prompt* node
-   defaults to `meta-llama/llama-3.3-70b-instruct:free`; change the `model` field if that one is
+   defaults to `nvidia/nemotron-3-ultra-550b-a55b:free`; change the `model` field if that one is
    unavailable or rate-limited. Free models have request caps, but a few emails per 15-min poll
    stays well within them.
 3. In n8n, create a **Header Auth** credential named `OpenRouter`:
