@@ -1,16 +1,16 @@
-# Email → Tracker automation (n8n + Ollama)
+# Email → Tracker automation (n8n + OpenRouter)
 
 Watches your Gmail for **job-application confirmation** emails, extracts the company
-and role with a **local LLM (Ollama)** — no API fees — and creates a job in the tracker
+and role with a **free LLM via OpenRouter**, and creates a job in the tracker
 with status **Applied**.
 
 ```
-Gmail Trigger ─▶ Extract (Ollama) ─▶ Parse ─▶ IF confirmation ─▶ Dedup ─▶ POST /api/jobs ─▶ label "tracked"
+Gmail Trigger ─▶ Extract (OpenRouter) ─▶ Parse ─▶ IF confirmation ─▶ Dedup ─▶ POST /api/jobs ─▶ label "tracked"
 ```
 
-Everything runs on your LXC. n8n talks to the tracker at `http://api:8000` and to the
-model at `http://ollama:11434` over the shared `backend_default` Docker network — no keys,
-no outbound calls, no cost.
+n8n runs on your LXC and reaches the tracker at `http://api:8000` over the shared
+`backend_default` Docker network. Model inference runs on **OpenRouter** (a free cloud
+model), so the only outbound traffic is one classification request per email.
 
 ## 1. Bring up the stack
 
@@ -53,14 +53,13 @@ Set it up:
 > providers may log/train on prompts — review OpenRouter's privacy settings (or use a no-logging
 > paid model) if that matters for your job-search data.
 
-**Ollama is no longer used.** Silence the mini PC by stopping it, and reclaim disk if you like:
+**Ollama has been removed** from this stack. If you were running it, drop the leftover
+container and reclaim its disk:
 
 ```bash
-docker compose -f automation/docker-compose.yml stop ollama
-docker exec automation-ollama-1 ollama rm qwen2.5:7b-instruct   # optional, before stopping
+docker compose -f automation/docker-compose.yml up -d --remove-orphans   # removes the old ollama container
+docker volume rm automation_ollama_models                                # optional: reclaims the model disk
 ```
-(The `ollama` service and its `OLLAMA_*` env vars in the compose file are now dead weight — safe
-to remove entirely; left in place for now in case you want to switch back to local.)
 
 ## 3. Open n8n and connect Gmail
 
@@ -91,17 +90,17 @@ Two variants ship here — import the one matching your auth choice
 
 After importing, open the workflow and:
 
-- Re-select your credential (the **IMAP** credential on the *Email Trigger (IMAP)* node, or the
-  **Gmail** credential on the *Gmail Trigger* / *Mark tracked* nodes — credential IDs don't
-  survive import).
-- Confirm the model name in the *Extract (Ollama)* node matches what you pulled.
+- Re-select your credentials (import doesn't carry them): the **OpenRouter** Header Auth
+  credential on the *Extract (OpenRouter)* node, plus the **IMAP** credential on the *Email
+  Trigger (IMAP)* node (or the **Gmail** credential on the *Gmail Trigger* / *Mark tracked* nodes).
+- Confirm the `model` in the *Build prompt* node is a free model available to your OpenRouter account.
 - Activate the workflow (toggle top-right).
 
 If anything imports oddly for your n8n version, build it by hand from the node reference below.
 
 ### IMAP variant — what differs
 
-The IMAP flow is `Email Trigger (IMAP) → Build prompt → Extract (Ollama) → Parse → IF → Dedup → Create job`
+The IMAP flow is `Email Trigger (IMAP) → Build prompt → Loop Over Items → Extract (OpenRouter) → Parse → IF → Dedup → Create job`
 (no *Mark tracked* node). Configure the trigger:
 
 - **Mailbox:** `INBOX` — or point it at a Gmail-filter label-folder (e.g. `Applications`) to
@@ -122,24 +121,15 @@ The IMAP flow is `Email Trigger (IMAP) → Build prompt → Extract (Ollama) →
   ```
 - Enable **Simplify** so you get clean `subject` / `from` / `text` fields. (Tweak the senders/phrases to your inbox over time.)
 
-### 2) Extract (Ollama) — HTTP Request
-- **Method:** POST  **URL:** `http://ollama:11434/api/chat`
-- **Options → Timeout:** `300000` (5 min) — a cold 7B call on CPU can be slow; don't let n8n abort it.
-- **Body → JSON** (Ollama forces valid JSON via the `format` schema; `temperature: 0` keeps it deterministic):
+### 2) Extract (OpenRouter) — HTTP Request
+- **Method:** POST  **URL:** `https://openrouter.ai/api/v1/chat/completions`
+- **Authentication:** Generic Credential Type → Header Auth → your `OpenRouter` credential (sends `Authorization: Bearer <key>`).
+- **Body → JSON:** `={{ $json.llmBody }}` — assembled by the *Build prompt* node (`model`, `temperature: 0`, `response_format: { type: "json_object" }`, `messages`), e.g.:
   ```json
   {
-    "model": "qwen2.5:7b-instruct",
-    "stream": false,
-    "options": { "temperature": 0 },
-    "format": {
-      "type": "object",
-      "properties": {
-        "is_application_confirmation": { "type": "boolean" },
-        "company": { "type": "string" },
-        "role": { "type": "string" }
-      },
-      "required": ["is_application_confirmation", "company", "role"]
-    },
+    "model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+    "temperature": 0,
+    "response_format": { "type": "json_object" },
     "messages": [
       {
         "role": "system",
@@ -156,12 +146,13 @@ The IMAP flow is `Email Trigger (IMAP) → Build prompt → Extract (Ollama) →
   > to whatever the Gmail Trigger actually outputs (check the node's output panel).
 
 ### 3) Parse — Code node
-Ollama returns the JSON as a string in `message.content`. Parse **every** item (a single
+OpenRouter returns the JSON in `choices[0].message.content`. Parse **every** item (a single
 poll can return several emails — iterate `$input.all()` so none are dropped, and set
-`pairedItem` to keep item linkage intact):
+`pairedItem` to keep item linkage intact). The regex pulls the JSON object out even if the
+model wraps it in prose or code fences:
 ```js
 return $input.all().map((item, i) => ({
-  json: JSON.parse(item.json.message.content),
+  json: JSON.parse((item.json.choices[0].message.content.match(/\{[\s\S]*\}/) || ['{}'])[0]),
   pairedItem: { item: i },
 }));
 ```
@@ -212,9 +203,8 @@ Two layers, both cheap:
 
 - **False positives / wrong company** (e.g. a job created from a "complete your application"
   reminder, or a job board like Indeed used as the company): tighten the system prompt with an
-  explicit exclusion for that case — that's cheaper and more reliable than a bigger model. A
-  larger model (`qwen2.5:7b`/`14b-instruct`) also helps but is slower and can hit the request
-  timeout. Keep `temperature: 0`.
+  explicit exclusion for that case — that's cheaper and more reliable than switching models.
+  Trying a stronger OpenRouter model can also help. Keep `temperature: 0`.
 - **Role left blank on a real confirmation:** the job title is often wrapped in a requisition
   ID and a status (e.g. `R0954602 IT Operations Analyst (OhioRISE) (Open)`). The prompt includes
   a worked example of stripping those; if a new wrapper format still fails, add it as another example.
@@ -225,9 +215,10 @@ Two layers, both cheap:
   the node by hand, keep that combine step.
 - **Model stalls / times out on one specific email (not a cold start):** newsletter-style
   confirmations (LinkedIn especially) pack the body with long tracking URLs and invisible
-  padding characters, which balloon the token count and choke CPU inference. The *Build prompt*
-  node strips URLs and zero-width/invisible characters (`clean`) before the 6000-char cap — e.g. a
-  LinkedIn confirmation drops from ~6000 to ~2000 chars while keeping the employer and role.
+  padding characters, which balloon the token count (slower, and can hit model context/rate limits).
+  The *Build prompt* node strips URLs and zero-width/invisible characters (`clean`) before the
+  6000-char cap — e.g. a LinkedIn confirmation drops from ~6000 to ~2000 chars while keeping the
+  employer and role.
 - **Real confirmation flagged as "not a confirmation" (LinkedIn especially):** these emails bury
   the actual confirmation under a "View similar jobs" recommendation block and notification
   boilerplate, so the model reads the whole thing as a job alert. The *Build prompt* node truncates
@@ -239,11 +230,14 @@ Two layers, both cheap:
   employer, not the platform. If these are still missed, the workflow likely wasn't re-imported.
 - **Changes not taking effect:** n8n runs its own stored copy of the workflow. After any prompt
   or model edit you must **re-import** (or hand-edit the node) in n8n — a `git pull` alone does nothing.
-- **Run aborts / times out:** the model is too slow per email for n8n's HTTP timeout. Use a
-  smaller model (`llama3.2:3b`), raise the HTTP Request node's timeout, and/or set Ollama
-  `keep_alive` to avoid reloading the model each poll.
-- **n8n can't reach Ollama/API:** confirm all three containers are on `backend_default`
-  (`docker network inspect backend_default`). n8n uses the service names `ollama` / `api`.
+- **OpenRouter errors:** a `401` means the *Extract (OpenRouter)* node has no credential selected
+  (or the value isn't `Bearer <key>`); `not available for free` / `404` means the model is gated
+  for your account — pick another at <https://openrouter.ai/models?max_price=0> and update `model`
+  in *Build prompt*; a `400` about `response_format` means the model doesn't support it — remove
+  that field from the body (the prompt + Parse still yield JSON).
+- **n8n can't reach the API:** confirm the n8n and api containers are both on `backend_default`
+  (`docker network inspect backend_default`). n8n reaches the tracker via the service name `api`;
+  OpenRouter is a normal external HTTPS URL and needs outbound internet from the LXC.
 - **Slow first run:** model load on first request; subsequent calls are fast. CPU latency is
   fine for a 15-minute poll.
 - **Login loops on n8n:** that's why `N8N_SECURE_COOKIE=false` is set — needed for plain-HTTP

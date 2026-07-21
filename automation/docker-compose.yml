@@ -1,9 +1,12 @@
-# Automation stack: n8n + Ollama, for the email -> tracker ingestion workflow.
+# Automation stack: n8n, for the email -> tracker ingestion workflow.
 #
 # Kept separate from backend/docker-compose.yml on purpose:
-#   - it's not part of the CI/CD deploy (Ollama is heavy and stateful), and
+#   - it's not part of the CI/CD deploy, and
 #   - it attaches to the backend stack's network so n8n can reach the API
-#     (http://api:8000) and Ollama (http://ollama:11434) by service name.
+#     (http://api:8000) by service name.
+#
+# Model inference runs on OpenRouter (a free cloud model), configured inside the
+# n8n workflow — nothing model-related runs in this stack.
 #
 # Bring it up with:
 #   docker compose -f automation/docker-compose.yml up -d
@@ -12,33 +15,6 @@
 name: automation
 
 services:
-  ollama:
-    image: ollama/ollama:latest
-    environment:
-      # Keep the model resident for 30m so a warm request avoids the multi-second
-      # reload that otherwise happens between 15-min polls (default unload is 5m).
-      - OLLAMA_KEEP_ALIVE=30m
-      # Serialize inference: on a CPU box parallel requests only contend for cores
-      # (no throughput gain) and cost extra KV-cache RAM. Belt-and-suspenders with
-      # the n8n concurrency cap. Raise this if you ever move to a GPU.
-      - OLLAMA_NUM_PARALLEL=1
-    volumes:
-      - ollama_models:/root/.ollama
-    networks:
-      - backend_default
-    restart: unless-stopped
-    # Uncomment to reach Ollama from the host for debugging (n8n doesn't need it):
-    # ports:
-    #   - "11434:11434"
-    # If the mini PC has an NVIDIA GPU, uncomment to use it (needs nvidia-container-toolkit):
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: all
-    #           capabilities: [gpu]
-
   n8n:
     image: n8nio/n8n:latest
     environment:
@@ -48,9 +24,8 @@ services:
       - WEBHOOK_URL=http://${HOST_IP:-localhost}:5678/
       # Allow login over plain HTTP on the LAN (no TLS in front of n8n here):
       - N8N_SECURE_COOKIE=false
-      # Run at most one production execution at a time, so overlapping polls never
-      # send two concurrent requests to the (CPU-bound) Ollama model. Extra executions
-      # queue instead of running in parallel.
+      # One production execution at a time: keeps overlapping polls from firing
+      # concurrent OpenRouter requests (rate limits) and preserves dedup ordering.
       - N8N_CONCURRENCY_PRODUCTION_LIMIT=1
       - GENERIC_TIMEZONE=${TZ:-UTC}
       - TZ=${TZ:-UTC}
@@ -60,12 +35,9 @@ services:
       - n8n_data:/home/node/.n8n
     networks:
       - backend_default
-    depends_on:
-      - ollama
     restart: unless-stopped
 
 volumes:
-  ollama_models:
   n8n_data:
 
 networks:
